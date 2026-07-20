@@ -1,0 +1,450 @@
+#!/usr/bin/env python3
+"""Write milestone reports with aerospace-level physical interpretation."""
+
+from __future__ import annotations
+
+import csv
+import math
+import sys
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PROJECT_ROOT))
+OUT = PROJECT_ROOT / "outputs"
+
+from rocket_sim import Environment, RocketParams, State
+from rocket_sim.analysis import summary_metrics
+
+
+def load_samples(path: Path) -> list[tuple[float, State]]:
+    with path.open() as f:
+        samples = []
+        for row in csv.DictReader(f):
+            samples.append(
+                (
+                    float(row["time_s"]),
+                    State(
+                        (float(row["x_m"]), float(row["y_m"]), float(row["z_m"])),
+                        (float(row["vx_mps"]), float(row["vy_mps"]), float(row["vz_mps"])),
+                        (float(row["qw"]), float(row["qx"]), float(row["qy"]), float(row["qz"])),
+                        (float(row["wx_radps"]), float(row["wy_radps"]), float(row["wz_radps"])),
+                    ),
+                )
+            )
+        return samples
+
+
+def metrics_table(metrics: dict[str, float]) -> str:
+    return f"""| Metric | Value |
+| --- | ---: |
+| Duration | {metrics["duration_s"]:.2f} s |
+| Samples | {metrics["samples"]:.0f} |
+| Final altitude | {metrics["final_altitude_m"]:.2f} m |
+| Final vertical velocity | {metrics["final_vertical_velocity_mps"]:.2f} m/s |
+| Maximum tilt angle | {metrics["max_tilt_deg"]:.2f} deg |
+| Minimum body-axis vertical component | {metrics["min_body_z_vertical_component"]:.3f} |
+| Maximum angular rate | {metrics["max_angular_rate_radps"]:.2f} rad/s |
+| Maximum lateral displacement | {metrics["max_lateral_displacement_m"]:.2f} m |
+| Maximum quaternion norm error | {metrics["max_quaternion_norm_error"]:.3e} |
+"""
+
+
+def saturation_fraction(path: Path) -> float:
+    with path.open() as f:
+        rows = list(csv.DictReader(f))
+    if not rows or "saturated" not in rows[0]:
+        return 0.0
+    return sum(int(row["saturated"]) for row in rows) / len(rows)
+
+
+def load_monte_carlo(path: Path) -> list[dict[str, float | str]]:
+    with path.open() as f:
+        converted_rows = []
+        for row in csv.DictReader(f):
+            converted: dict[str, float | str] = {}
+            for key, value in row.items():
+                converted[key] = value if key == "controller" else float(value)
+            converted_rows.append(converted)
+        return converted_rows
+
+
+def monte_carlo_summary(rows: list[dict[str, float | str]]) -> dict[str, dict[str, float]]:
+    summary: dict[str, dict[str, float]] = {}
+    for controller in ("open_loop", "pd_tvc", "lqr_tvc"):
+        subset = [row for row in rows if row["controller"] == controller]
+        summary[controller] = {
+            "trials": float(len(subset)),
+            "success_rate": sum(float(row["passed"]) for row in subset) / len(subset),
+            "median_max_tilt_deg": sorted(float(row["max_tilt_deg"]) for row in subset)[len(subset) // 2],
+            "median_max_lateral_m": sorted(float(row["max_lateral_m"]) for row in subset)[len(subset) // 2],
+            "worst_max_tilt_deg": max(float(row["max_tilt_deg"]) for row in subset),
+            "worst_max_lateral_m": max(float(row["max_lateral_m"]) for row in subset),
+            "mean_saturation_fraction": sum(float(row["saturation_fraction"]) for row in subset) / len(subset),
+        }
+    return summary
+
+
+def monte_carlo_table(summary: dict[str, dict[str, float]]) -> str:
+    names = {"open_loop": "Open loop", "pd_tvc": "PD TVC", "lqr_tvc": "LQR TVC"}
+    lines = [
+        "| Controller | Success rate | Median max tilt | Median max lateral drift | Worst max tilt | Worst lateral drift | Mean saturation |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+    ]
+    for key in ("open_loop", "pd_tvc", "lqr_tvc"):
+        data = summary[key]
+        lines.append(
+            f"| {names[key]} | {100.0 * data['success_rate']:.1f}% | "
+            f"{data['median_max_tilt_deg']:.2f} deg | {data['median_max_lateral_m']:.2f} m | "
+            f"{data['worst_max_tilt_deg']:.2f} deg | {data['worst_max_lateral_m']:.2f} m | "
+            f"{100.0 * data['mean_saturation_fraction']:.1f}% |"
+        )
+    return "\n".join(lines) + "\n"
+
+
+def week2_reference() -> tuple[RocketParams, Environment]:
+    misalign = math.radians(1.5)
+    rocket = RocketParams(
+        mass_kg=50.0,
+        inertia_kg_m2=(3.0, 3.0, 0.45),
+        thrust_n=850.0,
+        reference_area_m2=0.045,
+        drag_coefficient=0.35,
+        normal_force_coefficient_per_rad=2.5,
+        center_of_pressure_body_m=(0.0, 0.0, 0.35),
+        thrust_offset_body_m=(0.004, 0.0, 0.0),
+        thrust_direction_body=(math.sin(misalign), 0.0, math.cos(misalign)),
+    )
+    return rocket, Environment(wind_mps=(4.0, 1.0, 0.0))
+
+
+WEEK1_PHYSICS = """
+## Upper-Division Physical Interpretation
+
+Week 1 is a verification case for the rigid-body equations, not a flight-performance claim. With aligned thrust, no aerodynamic force, and zero external moment, the translational dynamics reduce to:
+
+```text
+m v_dot_I = [0, 0, T - mg]
+```
+
+so the vertical acceleration is constant:
+
+```text
+a_z = T/m - g
+```
+
+The parabolic altitude trace and linear vertical-velocity trace are direct consequences of this constant net force. Any lateral acceleration or angular acceleration in this case would indicate a frame convention, force-projection, or torque-balance error.
+
+The quaternion norm plot is also a physics check. The quaternion defines the rotation used to project body-frame thrust and aerodynamic forces into inertial coordinates. If `|q| != 1`, the implied rotation is no longer orthonormal and later force projections become nonphysical. Maintaining unit norm therefore verifies the attitude-state integrity needed before adding CP/CM moments and feedback control.
+
+The conservation tests check limiting cases of the governing equations: ballistic energy conservation, force-free linear momentum conservation, torque-free inertial angular momentum conservation, and `tau = r x F` angular acceleration from an offset force.
+"""
+
+
+WEEK2_PHYSICS = """
+## Upper-Division Physical Interpretation
+
+The Week 2 trajectory fails because rotational dynamics feed back into translational dynamics through thrust-vector projection. The disturbance moment is the sum of propulsion and aerodynamic contributions:
+
+```text
+tau_dist = r_T x F_T + (r_CP - r_CM) x F_N
+I omega_dot + omega x I omega = tau_dist
+```
+
+The aerodynamic normal force is driven by wind-relative angle of attack:
+
+```text
+v_rel,B = R_IB(q)(v_I - wind_I)
+qbar = 0.5 rho |v_rel|^2
+F_N ~ qbar S C_N_alpha alpha
+```
+
+Because the demonstration configuration places CP above CM in the body-axis convention, the normal-force moment is destabilizing rather than restoring. Thrust misalignment and thrust offset add persistent propulsion-induced moments. With no feedback term, angular acceleration integrates into angular rate, and angular rate integrates into attitude error.
+
+## Plot Physics
+
+### Altitude
+
+The altitude curve peaks because vertical thrust authority collapses as attitude error grows:
+
+```text
+T_vertical = T cos(theta)
+```
+
+Early in flight, `theta` is small and `T cos(theta)` exceeds weight plus vertical drag. As the vehicle tips, the vertical component decreases; near horizontal flight, thrust mainly accelerates the vehicle laterally; through inverted portions, thrust can project downward. The altitude peak is therefore an attitude-induced loss of vertical acceleration, not an engine-performance effect.
+
+### Unwrapped Pitch
+
+Unwrapped pitch shows the continuous rotational state instead of folding at `180 deg`. The monotonically growing pitch magnitude is the integral of uncontrolled angular rate. This is the correct diagnostic for tumble because a folded tilt angle can falsely look like recovery after the body rotates past inverted.
+
+### Body-Axis Vertical Component
+
+`body_z_z = cos(theta)` directly measures thrust-axis alignment with inertial up. Values near `+1`, `0`, and `-1` correspond to upward, horizontal, and downward thrust projection. The curve crossing toward negative values indicates the vehicle has lost ascent authority even if the engine is still producing thrust.
+
+### Lateral Drift
+
+Lateral drift is the integrated footprint of horizontal acceleration:
+
+```text
+m a_lateral ~= T sin(theta) + F_N,lateral - D_lateral
+```
+
+Once attitude diverges, the thrust term dominates and engine impulse is spent crossrange instead of vertically. The plot therefore shows coupled aero-propulsive instability, not simply the wind pushing the rocket sideways.
+"""
+
+
+WEEK3A_PHYSICS = """
+## Upper-Division Control Physics
+
+The Week 3A controller regulates the thrust-axis direction rather than an Euler angle:
+
+```text
+z_body,I = R_BI(q)[0, 0, 1]
+e_I = z_body,I x z_cmd,I
+e_B = R_IB(q)e_I
+tau_cmd,B = Kp e_B - Kd omega_B
+```
+
+For small attitude error, `e_B` is approximately the transverse rotation vector needed to align the thrust axis with inertial up. The proportional term acts like rotational stiffness, while the derivative term dissipates angular kinetic energy in the pitch/yaw modes. This directly attacks the Week 2 failure chain:
+
+```text
+disturbance moment -> angular rate -> attitude error -> thrust-axis loss
+```
+
+The ideal actuator allows the feedback law to be validated without the confounding effects of gimbal geometry. Because the commanded torque does not redirect the thrust force, attitude correction and translational acceleration are artificially decoupled. That is why Week 3A is a control-law verification step rather than an actuator-realistic result.
+
+### Plot-Level Interpretation
+
+Maintaining `body_z_z` near `+1` preserves `T cos(theta)` and suppresses `T sin(theta)`. The altitude trace remains increasing because vertical thrust projection is retained. Lateral drift is reduced because the controller prevents large horizontal thrust components and limits aerodynamic angle-of-attack growth.
+"""
+
+
+WEEK3B_PHYSICS = """
+## Upper-Division TVC Physics
+
+Week 3B replaces ideal torque with a finite thrust-vector-control actuator. Moment is generated by lateral thrust acting through the engine lever arm:
+
+```text
+tau_TVC = r_engine x F_thrust
+```
+
+For `r_engine = [0, 0, -L]`:
+
+```text
+tau_x = L F_y
+tau_y = -L F_x
+tau_max,TVC ~= L T sin(delta_max)
+```
+
+This converts the controls problem into an actuator allocation problem. A feedback law may request a stabilizing moment, but the plant can only supply that moment if the required lateral thrust lies inside the gimbal envelope.
+
+## Control Comparison Plot Physics
+
+### Altitude
+
+Open loop loses altitude because attitude divergence reduces `T cos(theta)`. Ideal torque climbs highest because it supplies corrective moment without changing the thrust direction. TVC remains stable but can trail ideal torque because some thrust must be vectored laterally to generate moment.
+
+### Unwrapped Pitch
+
+Open-loop pitch is the integral of uncompensated disturbance angular rate. Ideal torque directly applies `Kp e - Kd omega`. TVC must realize the same corrective objective through `r_engine x F_thrust`, so pitch response includes both controller dynamics and actuator allocation constraints.
+
+### Body-Axis Vertical Component
+
+`body_z_z = cos(theta)` is a propulsion-relevant attitude metric. Keeping it near `+1` means the controller is preserving vertical thrust authority. Letting it approach zero or negative means engine thrust is being converted into lateral or downward acceleration.
+
+### Lateral Drift
+
+Open-loop lateral drift grows through `T sin(theta)` and aerodynamic side force. Ideal torque minimizes drift because moment generation is decoupled from net force direction. TVC reduces drift relative to open loop but cannot eliminate the coupling: the same lateral thrust that stabilizes attitude also contributes to lateral acceleration.
+
+### Gimbal Usage
+
+The gimbal trace is an actuator-authority diagnostic. Early deflection arrests angular-rate growth; later deflection balances persistent thrust bias and aerodynamic moment. Saturation fraction indicates whether the requested moment remained within the finite control envelope.
+"""
+
+
+WEEK4A_PHYSICS = """
+## Upper-Division LQR Physics
+
+Near upright ascent, each transverse attitude channel can be locally approximated as:
+
+```text
+theta_dot = omega
+omega_dot = tau / I
+x = [theta, omega]^T
+u = tau
+```
+
+LQR selects feedback gains by minimizing:
+
+```text
+J = integral(x^T Q x + u^T R u) dt
+```
+
+The attitude weight penalizes thrust-axis pointing error, the rate weight penalizes angular kinetic energy, and `R` penalizes torque demand. Since the torque request is allocated through TVC, `R` also indirectly shapes gimbal usage and lateral thrust demand.
+
+This controller is local. It is designed about the upright operating point and is not a proof of global recovery from arbitrary tumble. The important verification step is that the LQR law is inserted back into the nonlinear plant with quaternion attitude, nonlinear thrust projection, aerodynamic CP/CM moments, thrust bias, finite gimbal authority, and saturation tracking.
+
+## Comparison Physics
+
+Open loop leaves `tau_dist` unopposed. Ideal torque performs best because moment and force direction are decoupled. PD TVC and LQR TVC are actuator-realistic because stabilizing moment requires lateral thrust. In the reference case, LQR TVC reduces tilt and lateral drift relative to PD TVC because its `Q/R` weighting damps the transverse rotational modes more efficiently while staying inside the same gimbal limit.
+
+## Week 4A Comparison Plot Results
+
+### Altitude
+
+The altitude panel shows how controller quality maps into vertical impulse. Open loop loses vertical performance because `T_vertical = T cos(theta)` collapses as attitude error grows. Ideal torque ends highest because the model lets it apply moment without redirecting thrust. PD TVC and LQR TVC both pay a real actuator penalty: the lateral thrust used for moment slightly reduces axial thrust projection. LQR TVC ending closer to ideal torque means its lower attitude excursions reduce the time-integrated loss in `T cos(theta)`.
+
+### Unwrapped Pitch
+
+The unwrapped pitch result separates true rotational response from folded attitude display. Open loop is the uncontrolled integral of disturbance torque through `I omega_dot + omega x I omega = tau_dist`. The LQR trace remains bounded because the controller increases effective transverse stiffness and damping around the upright operating point. Its smaller excursion relative to PD TVC indicates that the selected `Q/R` weights damp the pitch mode with less attitude error accumulation.
+
+### Body-Axis Vertical Component
+
+`body_z_z = cos(theta)` is the propulsion-relevant attitude result. Open loop approaching zero or negative values means thrust is no longer aligned with ascent. LQR TVC keeping the minimum `body_z_z` near unity indicates that the nonlinear trajectory remains inside the small-angle region assumed by the linearized design. This is the main validity check for using LQR in the nonlinear simulation.
+
+### Lateral Drift
+
+The lateral drift result is the integrated cost of attitude error:
+
+```text
+m a_lateral ~= T sin(theta) + F_N,lateral
+```
+
+Ideal torque has the lowest drift because it does not require lateral thrust to generate moment. LQR TVC reducing drift relative to PD TVC means the LQR controller reduced both sideways thrust projection from attitude error and the aerodynamic side-force exposure associated with larger angle of attack.
+
+### Gimbal Usage
+
+The gimbal panel tests whether the LQR improvement is physically achievable. Since `tau_max,TVC ~= L T sin(delta_max)`, a controller that improves tracking only by saturating the gimbal would not be robust. In the Week 4A result, gimbal saturation remains zero, so the LQR improvement is attributable to feedback structure within the available actuator envelope rather than unrealistic command clipping.
+"""
+
+
+WEEK4B_PLOT_PHYSICS = """
+## Summary Plot Physics
+
+### Success Rate
+
+The success-rate panel is a robustness metric over the specified uncertainty set. Each dispersion changes wind-relative velocity, dynamic pressure, mass properties, thrust alignment, CP/CM lever arm, aerodynamic normal-force slope, and gimbal authority. The open-loop vehicle has no feedback term in:
+
+```text
+I omega_dot + omega x I omega = tau_dist
+```
+
+so disturbance moments integrate into angular rate and attitude error. The closed-loop controllers succeed because they close that rotational-energy growth path and maintain enough thrust-axis alignment to satisfy the altitude, tilt, drift, and saturation gates.
+
+The result means the open-loop system has almost no robustness margin over the selected dispersions: changing wind, CP location, thrust alignment, or inertia usually pushes the vehicle outside the acceptable ascent envelope. The 100% closed-loop success rates mean both TVC controllers maintain a bounded rotational response for this uncertainty set; it is a statement about the sampled region of operation, not a claim of global stability.
+
+### Median Maximum Tilt
+
+Median maximum tilt is a peak-excursion statistic, not a final-state statistic. Open loop approaching `177 deg` indicates typical near-inverted tumble. At those attitudes:
+
+```text
+T_vertical = T cos(theta)
+```
+
+is near zero or negative, so thrust magnitude no longer translates into ascent performance. PD TVC and LQR TVC reduce this metric by producing stabilizing pitch/yaw moments through the engine lever arm. LQR improves the median in this campaign because the chosen `Q/R` weights penalize both attitude error and angular-rate energy.
+
+This panel is relevant because maximum tilt is a peak-envelope metric. A vehicle can end a run with a tolerable final attitude after rotating through an unacceptable excursion. Median maximum tilt measures whether the controller prevented departure from the ascent attitude corridor during the burn.
+
+### Median Maximum Lateral Drift
+
+Lateral drift is the integrated translational consequence of attitude error:
+
+```text
+m a_lateral ~= T sin(theta) + F_N,lateral
+```
+
+Open loop converts engine impulse into crossrange motion. PD TVC reduces drift by keeping `theta` small. LQR TVC reduces it further in this reference campaign because lower median attitude error produces less horizontal thrust projection. Nonzero closed-loop drift is the actuator-coupling penalty of TVC because corrective moment is produced by deliberately introducing lateral thrust.
+
+This panel is relevant because drift integrates errors over the trajectory. A brief attitude excursion can inject lateral velocity even if final attitude later looks acceptable. The LQR reduction from the PD TVC median indicates a lower accumulated crossrange impulse, not merely a prettier attitude trace.
+
+### Worst-Case Metrics In The Table
+
+Worst-case tilt and lateral drift are tail-risk indicators. Median values show typical behavior, but worst-case values reveal whether a small part of the dispersion set is near the edge of control authority. The lower LQR worst-case tilt and drift indicate more margin than PD TVC for this sampled set, while the conclusion remains bounded by the selected dispersions.
+
+### Mean Saturation
+
+Mean saturation checks whether robustness is being purchased with unavailable actuator authority. For TVC:
+
+```text
+F_lateral,max = T sin(delta_max)
+tau_max,TVC ~= L T sin(delta_max)
+```
+
+Near-zero saturation means the successful closed-loop runs remain inside the finite gimbal envelope. That makes the result relevant to GNC verification: the controllers are not relying on impossible moments to pass the Monte Carlo gates.
+"""
+
+
+def main() -> None:
+    week1_metrics = summary_metrics(load_samples(OUT / "week1_ascent.csv"), RocketParams(mass_kg=50.0, thrust_n=850.0), Environment())
+    week2_rocket, week2_env = week2_reference()
+    week2_metrics = summary_metrics(load_samples(OUT / "week2_disturbed_uncontrolled.csv"), week2_rocket, week2_env)
+    week3a_metrics = summary_metrics(load_samples(OUT / "week3a_controlled_ideal_torque.csv"), week2_rocket, week2_env)
+    week3b_metrics = summary_metrics(load_samples(OUT / "week3b_tvc_controlled.csv"), week2_rocket, week2_env)
+    week4a_metrics = summary_metrics(load_samples(OUT / "week4a_lqr_tvc_controlled.csv"), week2_rocket, week2_env)
+
+    (OUT / "week1_milestone_report.md").write_text(
+        "# Week 1 Milestone Report\n\n"
+        "## Objective\n\n"
+        "Verify the 13-state rigid-body dynamics core before adding aerodynamic disturbances or feedback control.\n\n"
+        "## Baseline Case\n\n"
+        + metrics_table(week1_metrics)
+        + WEEK1_PHYSICS
+    )
+    (OUT / "week2_milestone_report.md").write_text(
+        "# Week 2 Milestone Report\n\n"
+        "## Objective\n\n"
+        "Add wind, thrust misalignment, thrust offset, aerodynamic drag, normal force, and CP/CM moment to produce an open-loop failure case.\n\n"
+        "## Disturbed Case\n\n"
+        + metrics_table(week2_metrics)
+        + WEEK2_PHYSICS
+    )
+    (OUT / "week3a_milestone_report.md").write_text(
+        "# Week 3A Milestone Report\n\n"
+        "## Objective\n\n"
+        "Validate nonlinear thrust-axis attitude feedback using an ideal bounded body-torque actuator.\n\n"
+        "## Controlled Case\n\n"
+        + metrics_table(week3a_metrics)
+        + WEEK3A_PHYSICS
+    )
+    (OUT / "week3b_milestone_report.md").write_text(
+        "# Week 3B Milestone Report\n\n"
+        "## Objective\n\n"
+        "Replace ideal body torque with finite thrust-vector-control allocation through a gimbaled engine lever arm.\n\n"
+        "## TVC Controlled Case\n\n"
+        + metrics_table(week3b_metrics)
+        + f"| Gimbal saturation fraction | {100.0 * saturation_fraction(OUT / 'week3b_tvc_controlled.csv'):.1f}% |\n"
+        + WEEK3B_PHYSICS
+    )
+    (OUT / "week4a_milestone_report.md").write_text(
+        "# Week 4A Milestone Report\n\n"
+        "## Objective\n\n"
+        "Design a small-angle LQR attitude law and verify it in the nonlinear 6-DOF plant through the same TVC actuator model.\n\n"
+        "## LQR TVC Controlled Case\n\n"
+        + metrics_table(week4a_metrics)
+        + f"| Gimbal saturation fraction | {100.0 * saturation_fraction(OUT / 'week4a_lqr_tvc_controlled.csv'):.1f}% |\n"
+        + WEEK4A_PHYSICS
+    )
+
+    mc_rows = load_monte_carlo(OUT / "week4b_monte_carlo_results.csv")
+    mc_summary = monte_carlo_summary(mc_rows)
+    (OUT / "week4b_milestone_report.md").write_text(
+        "# Week 4B Milestone Report\n\n"
+        "## Objective\n\n"
+        "Evaluate robustness statistically by running randomized off-nominal vehicle and environment dispersions through open-loop, PD TVC, and LQR TVC cases.\n\n"
+        "## Pass/Fail Criteria\n\n"
+        "```text\n"
+        "max tilt < 25 deg\n"
+        "final altitude > 20 m\n"
+        "max lateral drift < 25 m\n"
+        "gimbal saturation fraction < 10%\n"
+        "```\n\n"
+        "## Results\n\n"
+        + monte_carlo_table(mc_summary)
+        + WEEK4B_PLOT_PHYSICS
+        + "\n## Engineering Takeaway\n\n"
+        "Nominal success is not robustness. Week 4B evaluates controller performance against dispersions in wind, mass properties, thrust alignment, aerodynamics, and actuator authority, then compares controllers using objective trajectory and actuator metrics.\n"
+    )
+    print("Wrote milestone reports")
+
+
+if __name__ == "__main__":
+    main()

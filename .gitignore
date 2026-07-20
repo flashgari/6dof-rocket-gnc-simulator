@@ -1,0 +1,23 @@
+# Python bytecode and test caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Local virtual environments
+.venv/
+venv/
+env/
+
+# Local OS/editor files
+.DS_Store
+.idea/
+.vscode/
+
+# Coverage and local logs
+.coverage
+htmlcov/
+*.log
+
+# Keep generated portfolio artifacts tracked:
+# outputs/*.csv, outputs/*.svg, outputs/*.html, and figures/*.svg are part of
+# the public engineering evidence for this project.
