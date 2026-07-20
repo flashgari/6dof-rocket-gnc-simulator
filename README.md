@@ -36,7 +36,7 @@ Monte Carlo robustness campaign with `100` randomized dispersions per controller
 
 ## Visual Evidence
 
-The main result is that uncontrolled ascent fails under realistic disturbance moments, while TVC feedback keeps the vehicle inside the attitude corridor across the sampled uncertainty envelope.
+The figures are meant to show a full GNC argument, not only attractive plots. The open-loop case establishes the failure mechanism: small thrust-vector and aerodynamic disturbances create body moments, the angular rate grows, the thrust axis rotates away from inertial vertical, and the vehicle begins spending engine impulse on lateral and eventually downward acceleration. The controlled cases then show what changes when feedback torque is introduced and when that torque is constrained by a real TVC geometry.
 
 ## Interactive Flight Animation
 
@@ -44,13 +44,27 @@ The project includes a standalone HTML animation generated from the simulator CS
 
 [Open the animation artifact](outputs/rocket_flight_animation.html)
 
-The animation compares open-loop failure, ideal body-torque control, PD TVC, and LQR TVC on a synchronized timeline. It shows the rocket attitude, trajectory, body-axis vertical alignment, lateral drift, and gimbal usage in one viewer.
+The animation compares open-loop failure, ideal body-torque control, PD TVC, and LQR TVC on a synchronized timeline. It shows the rocket attitude, trajectory, body-axis vertical alignment, lateral drift, and gimbal usage in one viewer. This matters because the failure is fundamentally coupled: attitude error is not just an angular quantity, it changes the direction of the thrust force in the translational equations.
 
 ![Rocket flight animation preview](figures/rocket-animation-preview.svg)
 
+In the open-loop lane, the vehicle may visually pass through an upright-looking attitude after tumbling, but that is not recovery. The unwrapped pitch history and `body_z_z` metric show that the thrust axis has already passed through horizontal and inverted orientations. During that interval, vertical thrust authority collapses and lateral kinetic energy accumulates. The controlled lanes demonstrate the opposite behavior: feedback keeps `body_z_z` close to one, so most of the thrust remains available for ascent rather than crossrange motion.
+
+## Monte Carlo Robustness
+
+The Monte Carlo figure summarizes `100` randomized dispersions for each controller. The sampled uncertainties include wind, thrust alignment, mass, inertia, CP location, normal-force slope, and gimbal authority. This is more meaningful than a single nominal run because launch vehicle ascent is sensitive to coupled dispersions: a slightly different inertia changes angular acceleration, a different CP location changes aerodynamic moment arm, and a different wind changes angle of attack and dynamic pressure loading.
+
 ![Monte Carlo robustness summary](figures/week4b-monte-carlo-robustness.svg)
 
+The open-loop success rate is `1.0%`, with median maximum tilt near `177 deg`, which means the representative uncontrolled case essentially tumbles into inverted flight. PD TVC and LQR TVC both reach `100.0%` success under the selected pass/fail gates, showing that feedback control is not merely tuned for one convenient trajectory. LQR TVC also reduces median maximum tilt from `12.0 deg` to `9.7 deg` and median lateral drift from `12.7 m` to `10.3 m` relative to PD TVC, indicating better transverse-mode regulation inside the same actuator envelope.
+
+## Controller Comparison
+
+The comparison plot separates three different engineering questions. Open loop answers, "What does the disturbed plant do without feedback?" Ideal body torque answers, "Can the attitude-control law stabilize the nonlinear rigid body if torque is available?" TVC answers, "Can the same stabilization objective be achieved when moment must come from tilting a thrust vector through a finite lever arm?"
+
 ![LQR control comparison](figures/week4a-lqr-control-comparison.svg)
+
+The ideal-torque case reaches the cleanest trajectory because it applies moment without changing the net thrust direction. TVC is more physically realistic: it creates moment through `r_engine x F_thrust`, which necessarily introduces lateral force components. That is why TVC can have more lateral drift than ideal torque even when attitude is stabilized. LQR TVC improves over PD TVC in the nominal case because its feedback gains are selected from a state/control cost trade instead of independent proportional and derivative tuning, but the result is still checked in the nonlinear 6-DOF plant rather than only in the linear design model.
 
 ## Review Path
 
@@ -64,21 +78,23 @@ The animation compares open-loop failure, ideal body-torque control, PD TVC, and
 
 ## Flight Physics
 
-The project is written to demonstrate aerospace reasoning, not just software output. Every generated figure has an upper-division physical interpretation tied to forces, moments, state variables, control laws, actuator limits, or verification criteria.
+This section summarizes the physical reasoning behind the simulator. The full plot-by-plot interpretation is in [docs/figure_results_interpretations.md](docs/figure_results_interpretations.md), but the governing ideas are included here so the README itself is understandable without opening every supporting file.
 
-Core flight-physics relationships used throughout the simulator:
+The central modeling choice is to treat ascent as a coupled attitude/translation problem. A rocket does not simply "go up" because the engine is firing; it goes up only while the thrust axis remains aligned with the desired inertial direction. Once a disturbance rotates the body, the same thrust magnitude produces a different inertial acceleration vector.
 
 **Translational Dynamics**
 
 `m r_ddot_I = R_BI(q) F_B + [0, 0, -mg]`
 
-Body-frame thrust and aerodynamic forces are rotated into the inertial frame before gravity is applied. This is why attitude error immediately becomes trajectory error during ascent.
+The simulator computes thrust and aerodynamic forces in the body frame, then rotates them into the inertial frame using the quaternion attitude. This is the key coupling between attitude and trajectory. If the body `z` axis points upward, thrust mostly contributes to altitude. If the body rotates sideways, the same engine force contributes to crossrange acceleration. If the vehicle tumbles through inverted attitudes, thrust can even oppose ascent. That is why attitude stabilization is not a cosmetic requirement; it is directly required for translational performance.
 
 **Rigid-Body Rotation**
 
 `I omega_dot_B + omega_B x (I omega_B) = tau_B`
 
-The vehicle attitude response depends on inertia and gyroscopic coupling, not just net torque. This is the nonlinear rotational plant stabilized by the PD and LQR controllers.
+The rotational dynamics use Euler's rigid-body equation in body coordinates. The `I omega_dot_B` term is the direct angular acceleration response to moment, while `omega_B x (I omega_B)` represents gyroscopic coupling between axes. Even for a simplified rocket body, this term matters once angular rates grow because torque and angular acceleration are not always collinear in the body frame. The controller therefore stabilizes a nonlinear rotational plant, not a scalar pitch-only toy model.
+
+The state uses quaternions instead of Euler angles because the open-loop failure intentionally passes through large rotations and near-inverted attitudes. Euler angles would introduce coordinate singularities and angle wrapping ambiguity; quaternions keep the force rotation well-defined throughout the tumble. The plots use unwrapped pitch and body-axis vertical alignment to avoid falsely interpreting a post-tumble orientation as recovery.
 
 **Aerodynamic Loading**
 
@@ -86,7 +102,9 @@ The vehicle attitude response depends on inertia and gyroscopic coupling, not ju
 
 `F_N ~= qbar S C_N_alpha alpha`
 
-Dynamic pressure and angle of attack drive the normal-force model. With CP/CM separation, that side force becomes an aerodynamic moment that can either restore or destabilize the vehicle.
+Aerodynamic force is computed from relative wind, not inertial velocity alone. Crosswind changes the velocity seen by the vehicle, which changes angle of attack and therefore normal force. Because dynamic pressure scales with `|v_rel|^2`, aerodynamic loads become more important as the vehicle accelerates. A small attitude error at low speed may be mild, while the same angular error at higher relative velocity produces much larger aerodynamic side force.
+
+The normal force acts through the center of pressure, while the equations of motion are taken about the center of mass. The resulting aerodynamic moment is approximately `(r_CP - r_CM) x F_N`. Depending on CP/CM ordering and sign convention, this moment can be restoring or destabilizing. In the disturbed open-loop case, the model is intentionally configured to demonstrate how an uncompensated aerodynamic/propulsive moment can drive attitude divergence.
 
 **Thrust Projection**
 
@@ -94,7 +112,9 @@ Dynamic pressure and angle of attack drive the normal-force model. With CP/CM se
 
 `T_lateral = T sin(theta)`
 
-A tumbling rocket can still generate thrust, but the useful vertical component collapses while lateral acceleration grows. This explains the open-loop altitude loss and crossrange drift.
+These projection equations explain the shape of the altitude and lateral-drift plots. As tilt angle grows, the vertical thrust component decreases with `cos(theta)`, while lateral thrust grows with `sin(theta)`. Near `90 deg` tilt, the engine is mostly accelerating the vehicle sideways. Past `90 deg`, part of the thrust points downward. This is why the uncontrolled case reaches a low final altitude and large lateral drift even though the engine is still producing thrust.
+
+The `body_z_z` metric used in the plots is a compact way to track this effect because it is the vertical component of the body thrust axis. Values near `1` mean thrust is aligned with inertial up. Values near `0` mean thrust is horizontal. Negative values mean the thrust axis is inverted. This is more physically meaningful than only looking at a wrapped pitch angle.
 
 **Moment And TVC Authority**
 
@@ -104,7 +124,25 @@ A tumbling rocket can still generate thrust, but the useful vertical component c
 
 `tau_max,TVC ~= L T sin(delta_max)`
 
-Thrust offsets, CP/CM separation, and engine gimbal commands all produce moments through lever arms. TVC control authority is therefore limited by engine location, thrust magnitude, and maximum gimbal angle.
+Every major disturbance and actuator in the project is a moment-arm problem. A thrust misalignment or thrust offset creates a moment because the force line of action does not pass perfectly through the center of mass. Aerodynamic normal force creates a moment because the center of pressure is displaced from the center of mass. TVC creates a corrective moment by intentionally tilting the thrust vector at an engine location below the center of mass.
+
+The TVC authority estimate `L T sin(delta_max)` is important because it turns the controller from an abstract feedback law into an actuator-limited system. Increasing gain cannot create unlimited moment; once the gimbal limit is reached, the commanded torque cannot be fully realized. This is why the project tracks gimbal angle and saturation fraction. In the nominal and Monte Carlo results here, the controllers stabilize the vehicle without sustained saturation, which supports the claim that the response is feasible for the modeled actuator rather than only mathematically stabilized by unrealistic torque.
+
+**PD Control Versus LQR**
+
+The PD controller adds rotational stiffness and damping:
+
+`tau_cmd = Kp e - Kd omega`
+
+The proportional term commands torque against thrust-axis attitude error, while the derivative term damps angular-rate growth. This is a useful first controller because it makes the physical stabilization mechanism transparent.
+
+The LQR controller is designed from a local small-angle model:
+
+`theta_dot = omega`
+
+`omega_dot = tau / I`
+
+The `Q/R` weighting changes the trade between attitude/rate error and control effort. LQR is not treated as a global tumble-recovery proof; it is a local controller around upright ascent. The important verification step is therefore running the LQR command through the same nonlinear quaternion dynamics and TVC allocation used for the PD controller. Its lower tilt and lateral drift show improved local regulation, while the gimbal telemetry checks that the improvement does not come from ignoring actuator limits.
 
 ## How To Run
 
