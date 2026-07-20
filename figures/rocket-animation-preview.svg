@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="520" viewBox="0 0 1120 520" role="img" aria-labelledby="title desc">
+  <title id="title">Rocket flight GNC animation preview</title>
+  <desc id="desc">Preview of the synchronized open-loop, ideal torque, PD TVC, and LQR TVC rocket flight animation.</desc>
+  <rect width="1120" height="520" fill="#f8fafc"/>
+  <rect x="32" y="28" width="1056" height="464" rx="10" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+  <text x="56" y="70" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700" fill="#111827">Interactive 6-DOF Flight Animation</text>
+  <text x="56" y="100" font-family="Arial, Helvetica, sans-serif" font-size="17" fill="#475569">Synchronized playback of open-loop failure, ideal body-torque control, PD TVC, and LQR TVC.</text>
+
+  <rect x="56" y="126" width="86" height="42" rx="7" fill="#ffffff" stroke="#334155" stroke-width="2"/>
+  <text x="85" y="153" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#111827">Play</text>
+  <line x1="170" y1="147" x2="820" y2="147" stroke="#cbd5e1" stroke-width="10" stroke-linecap="round"/>
+  <line x1="170" y1="147" x2="620" y2="147" stroke="#2563eb" stroke-width="10" stroke-linecap="round"/>
+  <circle cx="620" cy="147" r="16" fill="#2563eb"/>
+  <text x="846" y="154" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700" fill="#475569">t = 2.96 s</text>
+
+  <g transform="translate(56,198)">
+    <text x="0" y="0" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700" fill="#dc2626">Open loop</text>
+    <text x="0" y="22" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#475569">disturbed tumble</text>
+    <path d="M22 238 C 92 150, 220 145, 278 238" fill="none" stroke="#dc2626" stroke-width="3"/>
+    <g transform="translate(52,202) rotate(-13)">
+      <rect x="-8" y="-34" width="16" height="68" fill="#ef4444" stroke="#991b1b" stroke-width="2"/>
+      <polygon points="0,-48 -12,-30 12,-30" fill="#dc2626" stroke="#991b1b" stroke-width="2"/>
+    </g>
+    <rect x="0" y="260" width="300" height="54" fill="#ffffff" stroke="#e2e8f0" stroke-width="2"/>
+    <path d="M0 287 L72 287 L135 292 L185 308 L235 314 L270 292 L300 286" fill="none" stroke="#dc2626" stroke-width="3"/>
+    <text x="0" y="252" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700" fill="#475569">body z dot up</text>
+  </g>
+
+  <g transform="translate(408,198)">
+    <text x="0" y="0" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700" fill="#2563eb">Ideal torque</text>
+    <text x="0" y="22" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#475569">direct attitude moment</text>
+    <path d="M156 238 C 160 168, 160 96, 156 44" fill="none" stroke="#2563eb" stroke-width="3"/>
+    <g transform="translate(156,62) rotate(-1)">
+      <rect x="-8" y="-34" width="16" height="68" fill="#60a5fa" stroke="#1e40af" stroke-width="2"/>
+      <polygon points="0,-48 -12,-30 12,-30" fill="#2563eb" stroke="#1e40af" stroke-width="2"/>
+    </g>
+    <rect x="0" y="260" width="300" height="54" fill="#ffffff" stroke="#e2e8f0" stroke-width="2"/>
+    <path d="M0 314 C 75 314, 148 311, 218 301 S 300 286, 300 286" fill="none" stroke="#2563eb" stroke-width="3"/>
+    <text x="0" y="252" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700" fill="#475569">lateral drift (m)</text>
+  </g>
+
+  <g transform="translate(760,198)">
+    <text x="0" y="0" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700" fill="#059669">TVC / LQR TVC</text>
+    <text x="0" y="22" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#475569">finite gimbal authority</text>
+    <path d="M164 238 C 148 170, 134 104, 120 54" fill="none" stroke="#059669" stroke-width="3"/>
+    <g transform="translate(120,70) rotate(-9)">
+      <rect x="-8" y="-34" width="16" height="68" fill="#34d399" stroke="#065f46" stroke-width="2"/>
+      <polygon points="0,-48 -12,-30 12,-30" fill="#059669" stroke="#065f46" stroke-width="2"/>
+      <line x1="0" y1="38" x2="-22" y2="78" stroke="#7c3aed" stroke-width="4" marker-end="url(#arrow)"/>
+    </g>
+    <rect x="0" y="260" width="300" height="54" fill="#ffffff" stroke="#e2e8f0" stroke-width="2"/>
+    <path d="M0 260 C 18 314, 44 273, 86 298 S 198 300, 300 290" fill="none" stroke="#7c3aed" stroke-width="3"/>
+    <text x="0" y="252" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700" fill="#475569">gimbal angle (deg)</text>
+  </g>
+
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L7,3 z" fill="#7c3aed"/>
+    </marker>
+  </defs>
+</svg>

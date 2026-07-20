@@ -1,27 +1,23 @@
 # 6-DOF Rocket Flight Simulator with TVC, LQR, and Monte Carlo Verification
 
-Python launch-vehicle ascent simulation built as a GNC/controls portfolio project. The project models nonlinear rigid-body motion with quaternion attitude, adds aerodynamic and propulsion disturbances, implements attitude control, allocates torque through thrust vector control, compares PD and LQR feedback, and verifies robustness with a Monte Carlo dispersion campaign.
+This repository is a controls/GNC portfolio project for launch-vehicle ascent dynamics. It implements a nonlinear 6-DOF rigid-body rocket simulation, introduces aerodynamic and propulsion disturbances, demonstrates open-loop instability, stabilizes the vehicle with attitude feedback, allocates control through thrust vector control, compares PD and LQR control laws, and verifies robustness with a Monte Carlo dispersion campaign.
 
-The engineering story is:
+The project is intentionally written as an engineering artifact: the code, plots, animation, tests, and writeups are organized so a reviewer can trace the work from first-principles dynamics to closed-loop verification.
 
-```text
-rigid-body dynamics -> disturbance-driven open-loop failure -> feedback control -> TVC actuator allocation -> LQR comparison -> Monte Carlo robustness
-```
+## Engineering Summary
 
-## Start Here
+| Area | Implementation |
+| --- | --- |
+| Dynamics | 13-state nonlinear rigid-body model: inertial position, velocity, quaternion attitude, and body angular velocity |
+| Integration | Fixed-step RK4 with quaternion normalization and sanity tests |
+| Disturbances | Crosswind, thrust misalignment, thrust offset, drag, angle-of-attack normal force, and CP/CM moment arm |
+| Control | Ideal body-torque PD, actuator-realistic PD TVC, and LQR TVC |
+| Verification | Nominal controlled/uncontrolled comparisons plus 300-case Monte Carlo campaign |
+| Presentation | SVG plots, CSV outputs, milestone reports, synchronized HTML animation, and upper-division physics explanations |
 
-For a fast technical review, open these in order:
+## Results At A Glance
 
-1. `FIGURE_INDEX.md` - recruiter-facing guide to the key visuals and what each result means physically.
-2. `figures/week4b-monte-carlo-robustness.svg` - strongest robustness evidence across randomized dispersions.
-3. `figures/week4a-lqr-control-comparison.svg` - nominal comparison from open-loop failure through LQR TVC.
-4. `outputs/rocket_flight_animation.html` - synchronized visual comparison of open loop, ideal torque, PD TVC, and LQR TVC.
-5. `PORTFOLIO_WRITEUP.md` - polished engineering narrative for the full project.
-6. `docs/figure_results_interpretations.md` - upper-division plot-by-plot physics explanations.
-
-## Key Results
-
-Nominal disturbed ascent, `3 s` simulation window:
+Nominal disturbed ascent over a `3 s` simulation window:
 
 | Case | Final altitude | Max tilt | Max lateral drift | Gimbal saturation |
 | --- | ---: | ---: | ---: | ---: |
@@ -30,7 +26,7 @@ Nominal disturbed ascent, `3 s` simulation window:
 | PD TVC | 30.97 m | 12.94 deg | 13.24 m | 0.0% |
 | LQR TVC | 31.43 m | 10.30 deg | 10.73 m | 0.0% |
 
-Monte Carlo robustness campaign, 100 randomized dispersions per controller:
+Monte Carlo robustness campaign with `100` randomized dispersions per controller:
 
 | Controller | Success rate | Median max tilt | Median max lateral drift | Worst max tilt | Worst lateral drift |
 | --- | ---: | ---: | ---: | ---: | ---: |
@@ -38,7 +34,35 @@ Monte Carlo robustness campaign, 100 randomized dispersions per controller:
 | PD TVC | 100.0% | 12.05 deg | 12.69 m | 22.88 deg | 23.56 m |
 | LQR TVC | 100.0% | 9.67 deg | 10.35 m | 17.92 deg | 19.10 m |
 
-## Why This Matters
+## Visual Evidence
+
+The main result is that uncontrolled ascent fails under realistic disturbance moments, while TVC feedback keeps the vehicle inside the attitude corridor across the sampled uncertainty envelope.
+
+## Interactive Flight Animation
+
+The project includes a standalone HTML animation generated from the simulator CSV outputs:
+
+[Open the animation artifact](outputs/rocket_flight_animation.html)
+
+The animation compares open-loop failure, ideal body-torque control, PD TVC, and LQR TVC on a synchronized timeline. It shows the rocket attitude, trajectory, body-axis vertical alignment, lateral drift, and gimbal usage in one viewer.
+
+![Rocket flight animation preview](figures/rocket-animation-preview.svg)
+
+![Monte Carlo robustness summary](figures/week4b-monte-carlo-robustness.svg)
+
+![LQR control comparison](figures/week4a-lqr-control-comparison.svg)
+
+## Review Path
+
+| Start here | Purpose |
+| --- | --- |
+| [FIGURE_INDEX.md](FIGURE_INDEX.md) | Quick visual guide with numerical takeaways and physical interpretation |
+| [PORTFOLIO_WRITEUP.md](PORTFOLIO_WRITEUP.md) | Polished project narrative suitable for a portfolio page |
+| [docs/figure_results_interpretations.md](docs/figure_results_interpretations.md) | Upper-division explanation of every generated plot |
+| [outputs/rocket_flight_animation.html](outputs/rocket_flight_animation.html) | Synchronized animation of open loop, ideal torque, PD TVC, and LQR TVC |
+| [outputs/week4b_monte_carlo_results.csv](outputs/week4b_monte_carlo_results.csv) | Trial-by-trial robustness data |
+
+## Flight Physics
 
 The project is written to demonstrate aerospace reasoning, not just software output. Every generated figure has an upper-division physical interpretation tied to forces, moments, state variables, control laws, actuator limits, or verification criteria.
 
@@ -82,18 +106,6 @@ A tumbling rocket can still generate thrust, but the useful vertical component c
 
 Thrust offsets, CP/CM separation, and engine gimbal commands all produce moments through lever arms. TVC control authority is therefore limited by engine location, thrust magnitude, and maximum gimbal angle.
 
-The plot-by-plot results guide is:
-
-```text
-docs/figure_results_interpretations.md
-```
-
-The polished portfolio writeup is:
-
-```text
-PORTFOLIO_WRITEUP.md
-```
-
 ## How To Run
 
 The project uses only the Python standard library.
@@ -121,14 +133,13 @@ OK
 
 | Artifact | Purpose |
 | --- | --- |
-| `outputs/week3b_control_comparison_plots.svg` | Open loop vs ideal torque vs TVC comparison |
-| `outputs/week4a_lqr_control_comparison_plots.svg` | Open loop vs ideal torque vs PD TVC vs LQR TVC |
-| `outputs/week4b_monte_carlo_summary.svg` | Robustness summary over randomized dispersions |
-| `outputs/rocket_flight_animation.html` | Synchronized animation of open loop, ideal torque, PD TVC, and LQR TVC |
-| `outputs/week4b_monte_carlo_results.csv` | Trial-by-trial robustness data |
-| `figures/` | Stable recruiter-facing copies of the main generated plots |
-| `FIGURE_INDEX.md` | Fast visual guide with numerical takeaways and physical interpretations |
-| `docs/figure_results_interpretations.md` | Upper-division explanation of every generated graph |
+| [figures/week4b-monte-carlo-robustness.svg](figures/week4b-monte-carlo-robustness.svg) | Recruiter-facing Monte Carlo robustness summary |
+| [figures/rocket-animation-preview.svg](figures/rocket-animation-preview.svg) | README preview for the interactive rocket-flight animation |
+| [figures/week4a-lqr-control-comparison.svg](figures/week4a-lqr-control-comparison.svg) | Open loop vs ideal torque vs PD TVC vs LQR TVC comparison |
+| [outputs/rocket_flight_animation.html](outputs/rocket_flight_animation.html) | Synchronized animation of open loop, ideal torque, PD TVC, and LQR TVC |
+| [outputs/week4b_monte_carlo_results.csv](outputs/week4b_monte_carlo_results.csv) | Trial-by-trial robustness data |
+| [FIGURE_INDEX.md](FIGURE_INDEX.md) | Fast visual guide with numerical takeaways and physical interpretations |
+| [docs/figure_results_interpretations.md](docs/figure_results_interpretations.md) | Upper-division explanation of every generated graph |
 
 ## Technical Scope
 
