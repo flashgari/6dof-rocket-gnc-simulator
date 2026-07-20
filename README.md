@@ -42,19 +42,45 @@ Monte Carlo robustness campaign, 100 randomized dispersions per controller:
 
 The project is written to demonstrate aerospace reasoning, not just software output. Every generated figure has an upper-division physical interpretation tied to forces, moments, state variables, control laws, actuator limits, or verification criteria.
 
-Key physical relationships used throughout:
+Core flight-physics relationships used throughout the simulator:
 
-```text
-m r_ddot_I = R_BI(q) F_B + [0, 0, -mg]
-I omega_dot_B + omega_B x (I omega_B) = tau_B
-tau = r x F
-qbar = 0.5 rho |v_rel|^2
-F_N ~ qbar S C_N_alpha alpha
-T_vertical = T cos(theta)
-T_lateral = T sin(theta)
-tau_TVC = r_engine x F_thrust
-tau_max,TVC ~= L T sin(delta_max)
-```
+**Translational Dynamics**
+
+`m r_ddot_I = R_BI(q) F_B + [0, 0, -mg]`
+
+Body-frame thrust and aerodynamic forces are rotated into the inertial frame before gravity is applied. This is why attitude error immediately becomes trajectory error during ascent.
+
+**Rigid-Body Rotation**
+
+`I omega_dot_B + omega_B x (I omega_B) = tau_B`
+
+The vehicle attitude response depends on inertia and gyroscopic coupling, not just net torque. This is the nonlinear rotational plant stabilized by the PD and LQR controllers.
+
+**Aerodynamic Loading**
+
+`qbar = 0.5 rho |v_rel|^2`
+
+`F_N ~= qbar S C_N_alpha alpha`
+
+Dynamic pressure and angle of attack drive the normal-force model. With CP/CM separation, that side force becomes an aerodynamic moment that can either restore or destabilize the vehicle.
+
+**Thrust Projection**
+
+`T_vertical = T cos(theta)`
+
+`T_lateral = T sin(theta)`
+
+A tumbling rocket can still generate thrust, but the useful vertical component collapses while lateral acceleration grows. This explains the open-loop altitude loss and crossrange drift.
+
+**Moment And TVC Authority**
+
+`tau = r x F`
+
+`tau_TVC = r_engine x F_thrust`
+
+`tau_max,TVC ~= L T sin(delta_max)`
+
+Thrust offsets, CP/CM separation, and engine gimbal commands all produce moments through lever arms. TVC control authority is therefore limited by engine location, thrust magnitude, and maximum gimbal angle.
 
 The plot-by-plot results guide is:
 
