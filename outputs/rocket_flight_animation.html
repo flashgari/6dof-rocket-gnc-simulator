@@ -36,6 +36,16 @@
       flex-wrap: wrap;
       margin: 14px 0 16px;
     }
+    .comparison-note {
+      margin: -4px 0 14px;
+      padding: 10px 12px;
+      border: 1px solid var(--grid);
+      border-radius: 8px;
+      background: var(--panel);
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.4;
+    }
     button, select {
       border: 1px solid var(--axis);
       background: var(--panel);
@@ -105,7 +115,8 @@
 <body>
 <main>
   <h1>6-DOF Rocket Flight GNC Animation</h1>
-  <p>Synced playback of the disturbed open-loop failure, ideal body-torque control, PD thrust-vector control, and LQR thrust-vector control.</p>
+  <p>Synced playback of four separate simulation cases: disturbed open-loop failure, ideal body-torque control, PD thrust-vector control, and LQR thrust-vector control.</p>
+  <div class="comparison-note"><strong>Why four rockets?</strong> Each lane is a different run of the same vehicle model under the same disturbance environment. The side-by-side layout shows how the trajectory changes as the control architecture becomes more realistic: no feedback, ideal torque, PD TVC, then LQR TVC.</div>
   <div class="toolbar">
     <button id="play">Pause</button>
     <input id="time" type="range" min="0" max="200" value="0" aria-label="Animation time">
@@ -239,7 +250,7 @@ function drawLane(series, lane) {
   ctx.fillText(series.label, left + 26, 40);
   ctx.font = '500 12px system-ui';
   ctx.fillStyle = '#475569';
-  ctx.fillText('trajectory and attitude', left + 26, 60);
+  ctx.fillText('separate simulation case', left + 26, 60);
 
   ctx.strokeStyle = color;
   ctx.lineWidth = 2;
