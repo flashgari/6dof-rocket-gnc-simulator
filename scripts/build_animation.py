@@ -89,6 +89,31 @@ def build_html(data: list[dict]) -> str:
       font-size: 14px;
       line-height: 1.4;
     }}
+    .legend {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 16px;
+      align-items: center;
+      margin: 0 0 14px;
+      padding: 10px 12px;
+      border: 1px solid var(--grid);
+      border-radius: 8px;
+      background: var(--panel);
+      color: var(--muted);
+      font-size: 14px;
+    }}
+    .legend-item {{
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      white-space: nowrap;
+    }}
+    .swatch {{
+      width: 22px;
+      height: 4px;
+      border-radius: 999px;
+      display: inline-block;
+    }}
     button, select {{
       border: 1px solid var(--axis);
       background: var(--panel);
@@ -160,6 +185,13 @@ def build_html(data: list[dict]) -> str:
   <h1>6-DOF Rocket Flight GNC Animation</h1>
   <p>Synced playback of four separate simulation cases: disturbed open-loop failure, ideal body-torque control, PD thrust-vector control, and LQR thrust-vector control.</p>
   <div class="comparison-note"><strong>Why four rockets?</strong> Each lane is a different run of the same vehicle model under the same disturbance environment. The side-by-side layout shows how the trajectory changes as the control architecture becomes more realistic: no feedback, ideal torque, PD TVC, then LQR TVC.</div>
+  <div class="legend" aria-label="Animation color legend">
+    <span class="legend-item"><span class="swatch" style="background:#dc2626"></span>red = open loop</span>
+    <span class="legend-item"><span class="swatch" style="background:#2563eb"></span>blue = ideal torque</span>
+    <span class="legend-item"><span class="swatch" style="background:#059669"></span>green = PD TVC</span>
+    <span class="legend-item"><span class="swatch" style="background:#0891b2"></span>teal = LQR TVC</span>
+    <span class="legend-item"><span class="swatch" style="background:#7c3aed"></span>purple arrow = gimbal direction</span>
+  </div>
   <div class="toolbar">
     <button id="play">Pause</button>
     <input id="time" type="range" min="0" max="200" value="0" aria-label="Animation time">
@@ -315,6 +347,16 @@ function drawMiniPlot(x, y, w, h, series, key, label) {{
   ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 1;
   ctx.strokeRect(x, y, w, h);
   ctx.fillStyle = '#475569'; ctx.font = '500 12px system-ui'; ctx.fillText(label, x, y - 6);
+  let lx = x + w - 280;
+  ctx.font = '500 10px system-ui';
+  for (const d of DATA) {{
+    ctx.strokeStyle = d.color;
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(lx, y + 12); ctx.lineTo(lx + 14, y + 12); ctx.stroke();
+    ctx.fillStyle = '#475569';
+    ctx.fillText(d.label, lx + 18, y + 15);
+    lx += 68;
+  }}
   for (const d of DATA) {{
     ctx.strokeStyle = d.color; ctx.lineWidth = 2; ctx.beginPath();
     for (let i = 0; i <= frame && i < d.samples.length; i++) {{
