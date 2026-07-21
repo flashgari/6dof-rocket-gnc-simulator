@@ -68,6 +68,33 @@ def make_lqr_comparison(uncontrolled_path, ideal_path, tvc_path, lqr_path, svg_p
     legend=''.join(f'<line x1="{250+i*112}" y1="88" x2="{274+i*112}" y2="88" stroke="{color}" stroke-width="2.5"/><text x="{280+i*112}" y="92" class="legend">{name}</text>' for i,(name,color) in enumerate(legend_items))
     svg=f'<svg xmlns="http://www.w3.org/2000/svg" width="860" height="850" viewBox="0 0 860 850"><style>.bg{{fill:#f8fafc}}.title{{font:700 16px system-ui;fill:#111827}}.subtitle{{font:500 13px system-ui;fill:#475569}}.panel-title{{font:700 15px system-ui;fill:#111827}}.axis{{stroke:#334155;stroke-width:1.2}}.axis-label{{font:600 12px system-ui;fill:#334155}}.legend{{font:600 11px system-ui;fill:#475569}}</style><rect class="bg" width="860" height="850"/><text x="34" y="42" class="title">Week 4A LQR Control Comparison</text><text x="34" y="64" class="subtitle">Open loop, ideal torque, PD TVC, and small-angle LQR through the TVC actuator.</text>{legend}{body}</svg>'
     svg_path.write_text(svg); print(f'Wrote {svg_path}')
+def make_estimator_plot(estimated_path, svg_path):
+    e=read(estimated_path); x=col(e,'time_s')
+    panels=[
+        ('True vs Estimated Tilt',[{'name':'true','x':x,'y':col(e,'tilt_deg'),'color':'#2563eb'},{'name':'estimated','x':x,'y':col(e,'est_tilt_deg'),'color':'#0891b2'}],'tilt (deg)'),
+        ('Attitude Estimation Error',[{'name':'error','x':x,'y':col(e,'attitude_error_deg'),'color':'#dc2626'}],'error (deg)'),
+        ('Gyro Measurement',[{'name':'gx','x':x,'y':col(e,'gyro_x_radps'),'color':'#7c3aed'},{'name':'gy','x':x,'y':col(e,'gyro_y_radps'),'color':'#9333ea'}],'gyro (rad/s)'),
+        ('Accelerometer Specific Force',[{'name':'ax','x':x,'y':col(e,'accel_x_mps2'),'color':'#059669'},{'name':'az','x':x,'y':col(e,'accel_z_mps2'),'color':'#16a34a'}],'accel (m/s^2)'),
+        ('Estimated-State TVC Usage',[{'name':'gimbal','x':x,'y':col(e,'gimbal_total_deg'),'color':'#f97316'}],'gimbal (deg)'),
+    ]
+    body=''.join(panel_multi(n,s,lab,130+i*142) for i,(n,s,lab) in enumerate(panels))
+    legend_items=[('true','#2563eb'),('estimated','#0891b2'),('attitude error','#dc2626'),('gyro','#7c3aed'),('accelerometer','#059669'),('gimbal','#f97316')]
+    legend=''.join(f'<line x1="{170+i*108}" y1="88" x2="{194+i*108}" y2="88" stroke="{color}" stroke-width="2.5"/><text x="{200+i*108}" y="92" class="legend">{name}</text>' for i,(name,color) in enumerate(legend_items))
+    svg=f'<svg xmlns="http://www.w3.org/2000/svg" width="860" height="850" viewBox="0 0 860 850"><style>.bg{{fill:#f8fafc}}.title{{font:700 16px system-ui;fill:#111827}}.subtitle{{font:500 13px system-ui;fill:#475569}}.panel-title{{font:700 15px system-ui;fill:#111827}}.axis{{stroke:#334155;stroke-width:1.2}}.axis-label{{font:600 12px system-ui;fill:#334155}}.legend{{font:600 11px system-ui;fill:#475569}}</style><rect class="bg" width="860" height="850"/><text x="34" y="42" class="title">Week 5 Estimated-State TVC</text><text x="34" y="64" class="subtitle">Noisy IMU, low-rate attitude reference, quaternion estimator, and closed-loop TVC using estimated attitude/rate.</text>{legend}{body}</svg>'
+    svg_path.write_text(svg); print(f'Wrote {svg_path}')
+def make_estimated_control_comparison(lqr_path, estimated_path, svg_path):
+    lqr=read(lqr_path); e=read(estimated_path); lx=col(lqr,'time_s'); ex=col(e,'time_s')
+    panels=[
+        ('Altitude',[{'name':'truth LQR','x':lx,'y':col(lqr,'z_m'),'color':'#0891b2'},{'name':'estimated LQR','x':ex,'y':col(e,'z_m'),'color':'#f97316'}],'z (m)'),
+        ('Tilt',[{'name':'truth LQR','x':lx,'y':col(lqr,'tilt_deg'),'color':'#0891b2'},{'name':'estimated LQR','x':ex,'y':col(e,'tilt_deg'),'color':'#f97316'}],'tilt (deg)'),
+        ('Body Axis Vertical Component',[{'name':'truth LQR','x':lx,'y':col(lqr,'body_z_z'),'color':'#0891b2'},{'name':'estimated LQR','x':ex,'y':col(e,'body_z_z'),'color':'#f97316'}],'body z dot up'),
+        ('Lateral Drift',[{'name':'truth LQR','x':lx,'y':col(lqr,'lateral_m'),'color':'#0891b2'},{'name':'estimated LQR','x':ex,'y':col(e,'lateral_m'),'color':'#f97316'}],'lateral (m)'),
+        ('Gimbal Usage',[{'name':'truth LQR','x':lx,'y':col(lqr,'gimbal_total_deg'),'color':'#0891b2'},{'name':'estimated LQR','x':ex,'y':col(e,'gimbal_total_deg'),'color':'#f97316'}],'gimbal (deg)'),
+    ]
+    body=''.join(panel_multi(n,s,lab,130+i*142) for i,(n,s,lab) in enumerate(panels))
+    legend='<line x1="460" y1="88" x2="484" y2="88" stroke="#0891b2" stroke-width="2.5"/><text x="490" y="92" class="legend">truth-state LQR</text><line x1="590" y1="88" x2="614" y2="88" stroke="#f97316" stroke-width="2.5"/><text x="620" y="92" class="legend">estimated-state LQR</text>'
+    svg=f'<svg xmlns="http://www.w3.org/2000/svg" width="860" height="850" viewBox="0 0 860 850"><style>.bg{{fill:#f8fafc}}.title{{font:700 16px system-ui;fill:#111827}}.subtitle{{font:500 13px system-ui;fill:#475569}}.panel-title{{font:700 15px system-ui;fill:#111827}}.axis{{stroke:#334155;stroke-width:1.2}}.axis-label{{font:600 12px system-ui;fill:#334155}}.legend{{font:600 11px system-ui;fill:#475569}}</style><rect class="bg" width="860" height="850"/><text x="34" y="42" class="title">Week 5 Truth-State vs Estimated-State Control</text><text x="34" y="64" class="subtitle">Effect of sensor noise and estimator error on the same LQR TVC controller.</text>{legend}{body}</svg>'
+    svg_path.write_text(svg); print(f'Wrote {svg_path}')
 def main():
     make(OUT/'week1_ascent.csv','Week 1 Baseline Ascent',[('Altitude','z_m','z (m)','#2563eb'),('Vertical Velocity','vz_mps','vz (m/s)','#059669'),('Quaternion Norm','q_norm','|q|','#dc2626')],OUT/'week1_ascent_plots.svg')
     make(OUT/'week2_disturbed_uncontrolled.csv','Week 2 Disturbed Uncontrolled Ascent',[('Altitude','z_m','z (m)','#2563eb'),('Unwrapped Pitch History','unwrapped_pitch_deg','pitch (deg)','#dc2626'),('Body Axis Vertical Component','body_z_z','body z dot up','#059669'),('Lateral Drift','lateral_m','lateral (m)','#7c3aed')],OUT/'week2_disturbed_uncontrolled_plots.svg')
@@ -77,4 +104,6 @@ def main():
     make_comparison(OUT/'week2_disturbed_uncontrolled.csv',OUT/'week3a_controlled_ideal_torque.csv',OUT/'week3b_tvc_controlled.csv',OUT/'week3b_control_comparison_plots.svg')
     make_comparison(OUT/'week2_disturbed_uncontrolled.csv',OUT/'week3a_controlled_ideal_torque.csv',OUT/'week3b_tvc_controlled.csv',OUT/'week3a_controlled_vs_uncontrolled_plots.svg')
     make_lqr_comparison(OUT/'week2_disturbed_uncontrolled.csv',OUT/'week3a_controlled_ideal_torque.csv',OUT/'week3b_tvc_controlled.csv',OUT/'week4a_lqr_tvc_controlled.csv',OUT/'week4a_lqr_control_comparison_plots.svg')
+    make_estimator_plot(OUT/'week5_estimated_tvc_controlled.csv',OUT/'week5_estimated_tvc_plots.svg')
+    make_estimated_control_comparison(OUT/'week4a_lqr_tvc_controlled.csv',OUT/'week5_estimated_tvc_controlled.csv',OUT/'week5_estimated_vs_truth_control_plots.svg')
 if __name__=='__main__': main()

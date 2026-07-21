@@ -38,7 +38,7 @@ python3 scripts/run_all.py
 Expected result:
 
 ```text
-Ran 23 tests
+Ran 28 tests
 OK
 ```
 

@@ -10,6 +10,7 @@ def main():
     run([sys.executable,'scripts/run_week3b_tvc_ascent.py'])
     run([sys.executable,'scripts/run_week4a_lqr_tvc_ascent.py'])
     run([sys.executable,'scripts/run_week4b_monte_carlo.py'])
+    run([sys.executable,'scripts/run_week5_estimated_tvc_ascent.py'])
     run([sys.executable,'scripts/plot_outputs.py'])
     run([sys.executable,'scripts/write_reports.py'])
     run([sys.executable,'scripts/build_animation.py'])

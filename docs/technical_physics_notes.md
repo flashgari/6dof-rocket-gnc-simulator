@@ -176,3 +176,27 @@ Monte Carlo analysis tests sensitivity to uncertainty in winds, mass properties,
 - saturation checks actuator authority margin
 
 The Week 4B summary plot is therefore a compact robustness statement: open loop fails because disturbance moments are unopposed, PD TVC succeeds by closing the rotational loop through gimbaled thrust, and LQR TVC improves median tilt/drift in this envelope through a more structured state-error/control-effort trade.
+
+## Week 5 Sensor And Estimation Physics
+
+Week 5 changes the feedback assumption. Earlier controllers use truth-state attitude and angular rate; Week 5 uses measured and estimated quantities. The gyro model is:
+
+```text
+omega_meas = omega_true + b_g + eta_g
+```
+
+so uncompensated bias would integrate into attitude drift. The quaternion estimator subtracts a bias estimate and propagates:
+
+```text
+q_hat_dot = 0.5 q_hat [0, omega_meas - b_hat]
+```
+
+The accelerometer model is body-frame specific force:
+
+```text
+f_B = R_IB(q)(a_I - g_I)
+```
+
+This is not the same as a gravity direction measurement during powered ascent. Since thrust and aerodynamic loads dominate `f_B`, an accelerometer-only attitude correction would tend to align with the thrust environment rather than with inertial down. That is why Week 5 uses a low-rate attitude reference for correction and treats accelerometer outputs as logged avionics measurements.
+
+Estimated-state feedback matters because estimator error enters the TVC loop as a false attitude/rate error. If `q_hat` lags or drifts, the controller may command moment in the wrong direction or waste gimbal authority. The Week 5 results show sub-degree attitude estimation error and zero gimbal saturation, so the estimator is accurate enough for the LQR TVC controller to preserve thrust-axis alignment in the nominal disturbed ascent.

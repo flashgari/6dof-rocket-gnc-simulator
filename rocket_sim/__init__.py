@@ -6,11 +6,17 @@ from .models import Environment, RocketParams, State
 from .control import IdealTorqueController
 from .control import LQRAttitudeController
 from .control import TVCController
+from .sensors import AttitudeEstimator
+from .sensors import AttitudeEstimatorConfig
+from .sensors import SensorModel
 
 __all__ = [
     "Environment",
+    "AttitudeEstimator",
+    "AttitudeEstimatorConfig",
     "IdealTorqueController",
     "LQRAttitudeController",
+    "SensorModel",
     "TVCController",
     "RocketParams",
     "State",

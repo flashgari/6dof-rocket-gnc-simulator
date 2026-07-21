@@ -2,12 +2,12 @@
 
 ## Project Objective
 
-This project is a Python-based launch-vehicle GNC simulation and verification workflow. The goal is to model nonlinear rigid-body ascent dynamics, introduce realistic disturbance mechanisms, demonstrate open-loop failure, stabilize the vehicle with attitude feedback, implement actuator-realistic thrust vector control, compare PD and LQR control, and evaluate robustness with a Monte Carlo dispersion campaign.
+This project is a Python-based launch-vehicle GNC simulation and verification workflow. The goal is to model nonlinear rigid-body ascent dynamics, introduce realistic disturbance mechanisms, demonstrate open-loop failure, stabilize the vehicle with attitude feedback, implement actuator-realistic thrust vector control, compare PD and LQR control, evaluate robustness with a Monte Carlo dispersion campaign, and close the loop through a sensor-based attitude estimator.
 
 The project is structured around the same logic used in flight-dynamics and controls verification:
 
 ```text
-derive dynamics -> build nominal simulation -> add disturbances -> observe failure -> design controller -> model actuator -> verify robustness
+derive dynamics -> build nominal simulation -> add disturbances -> observe failure -> design controller -> model actuator -> verify robustness -> add sensors and estimated-state feedback
 ```
 
 ## System Model
@@ -155,6 +155,28 @@ Results:
 
 The open-loop success rate shows that the uncontrolled vehicle has almost no robustness margin over the selected uncertainty set. The closed-loop results show that both TVC controllers keep the vehicle inside the defined ascent envelope. LQR TVC reduces median and worst-case tilt/drift relative to PD TVC in this campaign, which indicates improved margin for the selected `Q/R` weights and dispersions.
 
+## Sensor Simulation And Attitude Estimation
+
+Week 5 adds an avionics layer between the nonlinear plant and the controller. The simulated IMU measures biased/noisy angular rate and body-frame specific force:
+
+```text
+omega_meas = omega_true + b_g + eta_g
+f_meas = R_IB(q)(a_I - g_I) + b_a + eta_a
+```
+
+The accelerometer is intentionally treated as specific force rather than a clean gravity-vector attitude sensor. During powered ascent, thrust dominates the accelerometer measurement, so using it as a direct "down" reference would be physically incorrect.
+
+The quaternion estimator propagates attitude using bias-corrected gyro measurements and applies low-rate attitude-reference corrections:
+
+```text
+q_hat_dot = 0.5 q_hat [0, omega_meas - b_hat]
+e_I = z_hat,I x z_ref,I
+```
+
+The LQR TVC controller then uses `q_hat` and `omega_hat` instead of truth attitude and truth angular rate. The estimated-state result reaches final altitude `31.42 m`, limits maximum tilt to `10.43 deg`, limits lateral drift to `10.83 m`, keeps maximum attitude estimation error to `0.32 deg`, and keeps gimbal saturation at `0.0%`.
+
+The physical takeaway is that sensor noise and bias do not automatically invalidate a controller, but they become part of the feedback loop. Estimation lag or drift would appear as false attitude/rate error and could waste gimbal authority or inject lateral thrust. In this case, the estimator error remains small enough for the TVC controller to preserve the same thrust-axis alignment objective as the truth-state LQR baseline.
+
 ## What The Plots Prove
 
 The Week 2 plots prove the failure mechanism: disturbance moments rotate the thrust axis, and the trajectory fails because thrust projection changes.
@@ -167,6 +189,8 @@ The Week 4A plots prove that a local LQR design can be inserted into the nonline
 
 The Week 4B plot proves robustness statistically over a defined dispersion set, which is stronger evidence than a single nominal run.
 
+The Week 5 plots prove that the controller remains effective when driven by estimated attitude and angular rate rather than perfect truth-state feedback.
+
 ## Limitations
 
 - Aerodynamics use a simplified normal-force model, not full coefficient tables.
@@ -178,7 +202,8 @@ The Week 4B plot proves robustness statistically over a defined dispersion set, 
 ## Next Improvements
 
 - Add actuator rate limits and gimbal dynamics.
-- Add sensor models and an estimator.
+- Add gyro-bias estimation and estimator latency.
+- Add translational GPS/barometer measurements and Kalman filtering.
 - Add mass depletion and time-varying inertia.
 - Add atmosphere variation with altitude.
 - Add gain scheduling across dynamic pressure and mass states.
@@ -193,3 +218,4 @@ The Week 4B plot proves robustness statistically over a defined dispersion set, 
 - TVC couples attitude correction to lateral acceleration because lateral thrust is the moment-generation mechanism.
 - LQR is designed on a local linear model and must be verified on the nonlinear plant.
 - Monte Carlo analysis demonstrates robustness over uncertainty, not just nominal performance.
+- Estimated-state feedback connects controls to avionics by showing how sensor bias/noise and attitude estimation affect TVC commands.

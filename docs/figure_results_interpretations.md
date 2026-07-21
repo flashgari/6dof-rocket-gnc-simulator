@@ -245,3 +245,64 @@ outputs/rocket_flight_animation.html
 ```
 
 The animation is the time-domain version of the same conclusions. Open loop may visually point upward again after tumbling, but the unwrapped pitch and trajectory show that it already lost vertical thrust authority. Ideal torque isolates the feedback law. PD TVC demonstrates actuator-realistic stabilization. LQR TVC shows that a local optimal controller can reduce attitude and drift while staying inside the same gimbal authority.
+
+## Week 5 Estimated-State TVC Plot
+
+Artifact:
+
+```text
+outputs/week5_estimated_tvc_plots.svg
+```
+
+### True vs Estimated Tilt
+
+The true and estimated tilt traces stay nearly coincident, with maximum attitude estimation error `0.32 deg` and RMS attitude estimation error `0.17 deg`. This matters because TVC control is driven by thrust-axis pointing. If the estimator allowed large pitch/yaw error, the controller would command moments against the wrong attitude state and could inject lateral thrust unnecessarily.
+
+### Attitude Estimation Error
+
+The error remains sub-degree across the disturbed ascent. The estimator is not simply plotting truth; it propagates quaternion attitude from biased/noisy gyro measurements and corrects with a noisy low-rate attitude reference. The bounded error shows that gyro bias correction plus periodic reference updates prevents drift from becoming dynamically relevant over the burn.
+
+### Gyro Measurement
+
+The gyro measurement panel shows what the rate feedback channel actually sees:
+
+```text
+omega_meas = omega_true + b_g + eta_g
+```
+
+Rate feedback is central to both damping and LQR state feedback. A residual gyro bias would look like false angular rate and could cause steady TVC commands. The plotted response verifies that the estimator/controller can tolerate the modeled bias and noise without saturating the actuator.
+
+### Accelerometer Specific Force
+
+The accelerometer panel is interpreted as specific force:
+
+```text
+f_B = R_IB(q)(a_I - g_I)
+```
+
+During powered ascent this channel is dominated by thrust and aerodynamic acceleration, not gravity alone. That is why the estimator does not use accelerometer-only gravity leveling as the primary attitude correction. This is an important avionics distinction: launch-vehicle IMU acceleration is a force measurement, not a direct attitude measurement.
+
+### Estimated-State TVC Usage
+
+The gimbal trace remains inside the actuator envelope with `0.0%` saturation. This means estimation errors do not cause excessive false control demand. The result supports estimated-state feasibility: the controller remains close to the truth-state LQR response while using noisy sensor-derived attitude and angular rate.
+
+## Week 5 Truth-State vs Estimated-State Control Plot
+
+Artifact:
+
+```text
+outputs/week5_estimated_vs_truth_control_plots.svg
+```
+
+### What The Comparison Means
+
+This plot compares the same LQR TVC controller using two feedback sources:
+
+- truth-state feedback: exact simulation quaternion and angular velocity
+- estimated-state feedback: noisy sensor measurements processed by the quaternion estimator
+
+The altitude, tilt, body-axis vertical component, lateral drift, and gimbal traces remain close. That means the estimation layer introduces only small control-relevant error in the nominal disturbed case. The result is a bridge from controls to avionics: the controller is no longer relying on physically impossible perfect state knowledge.
+
+### Physical Relevance
+
+The comparison is important because estimator error enters the feedback loop as an apparent attitude/rate error. If the estimate lagged, drifted, or amplified noise, the TVC system would either under-correct the true disturbance or over-command gimbal motion. Instead, the estimated-state case reaches `31.42 m` final altitude, `10.43 deg` maximum tilt, `10.83 m` maximum lateral drift, and `0.0%` saturation, which is close to the truth-state LQR baseline. The estimator therefore preserves the control objective within the modeled sensor and actuator assumptions.

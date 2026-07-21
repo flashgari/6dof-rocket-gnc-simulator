@@ -101,6 +101,19 @@ def monte_carlo_table(summary: dict[str, dict[str, float]]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def estimator_metrics(path: Path) -> dict[str, float]:
+    with path.open() as f:
+        rows = list(csv.DictReader(f))
+    errors = [float(row["attitude_error_deg"]) for row in rows]
+    rates = [float(row["rate_error_radps"]) for row in rows]
+    return {
+        "max_attitude_error_deg": max(errors),
+        "rms_attitude_error_deg": math.sqrt(sum(error**2 for error in errors) / len(errors)),
+        "max_rate_error_radps": max(rates),
+        "saturation_fraction": sum(int(row["saturated"]) for row in rows) / len(rows),
+    }
+
+
 def week2_reference() -> tuple[RocketParams, Environment]:
     misalign = math.radians(1.5)
     rocket = RocketParams(
@@ -373,6 +386,85 @@ Near-zero saturation means the successful closed-loop runs remain inside the fin
 """
 
 
+WEEK5_PHYSICS = """
+## Upper-Division Avionics And Estimation Physics
+
+Week 5 changes the closed-loop architecture from truth-state control to estimated-state control. This is a major GNC step because real flight software does not receive the true quaternion and true body angular velocity from the plant. It receives measurements corrupted by sensor bias, white noise, sampling, and reference-update limitations.
+
+The gyro model is:
+
+```text
+omega_meas = omega_true + b_g + eta_g
+```
+
+The accelerometer model is specific force:
+
+```text
+f_B = R_IB(q)(a_I - g_I)
+f_meas = f_B + b_a + eta_a
+```
+
+The specific-force definition is important. During powered ascent, an accelerometer does not measure gravity direction by itself. It measures non-gravitational acceleration, which is dominated by thrust and aerodynamic force. A naive "accelerometer points down" attitude correction would be physically invalid during high-thrust ascent because the sensed acceleration vector is largely aligned with thrust, not with gravity. The project therefore logs accelerometer channels as avionics measurements but uses gyro propagation plus a low-rate noisy attitude reference for attitude correction.
+
+## Estimator Physics
+
+The estimator propagates quaternion attitude from bias-corrected gyro rate:
+
+```text
+omega_hat = omega_meas - b_hat
+q_hat_dot = 0.5 q_hat [0, omega_hat]
+```
+
+Gyro integration is high-bandwidth but drifts when bias is imperfect. The low-rate attitude reference bounds that drift by applying a small correction based on thrust-axis pointing error:
+
+```text
+e_I = z_hat,I x z_ref,I
+e_B = R_IB(q_hat)e_I
+```
+
+This correction is intentionally applied to the thrust-axis direction because pitch/yaw alignment is the propulsion-relevant attitude quantity for vertical ascent. Roll about the thrust axis is less important for this simplified axisymmetric vehicle model.
+
+## Estimated-State Control Physics
+
+The LQR TVC controller is driven by:
+
+```text
+q_control = q_hat
+omega_control = omega_hat
+```
+
+while the plant still evolves with the true nonlinear 6-DOF state. Estimation error therefore enters the feedback loop as a false attitude/rate command. If the estimate lags or drifts, the TVC controller can command the wrong moment, inject extra lateral thrust, or use up gimbal authority.
+
+The Week 5 result remains close to the truth-state LQR case: final altitude is `31.42 m`, maximum tilt is `10.43 deg`, maximum lateral drift is `10.83 m`, maximum attitude estimation error is `0.32 deg`, RMS attitude estimation error is `0.17 deg`, and gimbal saturation is `0.0%`.
+
+## Plot-Level Interpretation
+
+### True vs Estimated Tilt
+
+The true and estimated tilt traces stay nearly coincident. This means the estimator tracks the transverse thrust-axis attitude well enough for the controller to remain inside the same small-angle operating region assumed by the LQR design.
+
+### Attitude Estimation Error
+
+The attitude error remains sub-degree. This is small relative to the roughly `10 deg` controlled tilt envelope, so estimator error is not the dominant driver of the closed-loop response. The plot demonstrates that gyro propagation plus reference correction prevents bias-driven attitude drift over the simulated ascent window.
+
+### Gyro Measurement
+
+The gyro channels show the measured angular-rate signal that the controller indirectly depends on. Rate measurement matters because derivative damping and LQR rate feedback are both sensitive to angular-rate error. Bias-corrected gyro propagation keeps the estimator from interpreting a constant sensor bias as real vehicle rotation.
+
+### Accelerometer Specific Force
+
+The accelerometer channels are dominated by powered-flight specific force. This supports the modeling decision not to use accelerometer-only gravity leveling during ascent. In a rocket under thrust, accelerometer magnitude and direction reflect thrust and aerodynamic loading, not just vehicle attitude relative to gravity.
+
+### Estimated-State TVC Usage
+
+The gimbal trace verifies actuator feasibility under estimated-state feedback. If sensor noise caused aggressive false corrections, the gimbal angle or saturation fraction would increase. The result stays within the same actuator envelope as truth-state LQR, showing that the estimator does not destabilize or overdrive the TVC loop in the nominal disturbed case.
+
+## Engineering Takeaway
+
+Week 5 demonstrates the transition from controls-only simulation to avionics-aware GNC simulation. The controller is no longer granted perfect attitude knowledge; it must operate through a physically motivated measurement and estimation layer. The resulting closed-loop performance shows that the estimator error is small enough to preserve TVC stability and ascent performance for the modeled sensor noise/bias case.
+"""
+
+
 def main() -> None:
     week1_metrics = summary_metrics(load_samples(OUT / "week1_ascent.csv"), RocketParams(mass_kg=50.0, thrust_n=850.0), Environment())
     week2_rocket, week2_env = week2_reference()
@@ -380,6 +472,7 @@ def main() -> None:
     week3a_metrics = summary_metrics(load_samples(OUT / "week3a_controlled_ideal_torque.csv"), week2_rocket, week2_env)
     week3b_metrics = summary_metrics(load_samples(OUT / "week3b_tvc_controlled.csv"), week2_rocket, week2_env)
     week4a_metrics = summary_metrics(load_samples(OUT / "week4a_lqr_tvc_controlled.csv"), week2_rocket, week2_env)
+    week5_metrics = summary_metrics(load_samples(OUT / "week5_estimated_tvc_controlled.csv"), week2_rocket, week2_env)
 
     (OUT / "week1_milestone_report.md").write_text(
         "# Week 1 Milestone Report\n\n"
@@ -422,6 +515,19 @@ def main() -> None:
         + metrics_table(week4a_metrics)
         + f"| Gimbal saturation fraction | {100.0 * saturation_fraction(OUT / 'week4a_lqr_tvc_controlled.csv'):.1f}% |\n"
         + WEEK4A_PHYSICS
+    )
+    est_metrics = estimator_metrics(OUT / "week5_estimated_tvc_controlled.csv")
+    (OUT / "week5_milestone_report.md").write_text(
+        "# Week 5 Milestone Report\n\n"
+        "## Objective\n\n"
+        "Add a sensor and attitude-estimation layer, then close the TVC control loop using estimated attitude and angular rate instead of truth-state feedback.\n\n"
+        "## Estimated-State Controlled Case\n\n"
+        + metrics_table(week5_metrics)
+        + f"| Maximum attitude estimation error | {est_metrics['max_attitude_error_deg']:.2f} deg |\n"
+        + f"| RMS attitude estimation error | {est_metrics['rms_attitude_error_deg']:.2f} deg |\n"
+        + f"| Maximum angular-rate estimation error | {est_metrics['max_rate_error_radps']:.3f} rad/s |\n"
+        + f"| Gimbal saturation fraction | {100.0 * est_metrics['saturation_fraction']:.1f}% |\n"
+        + WEEK5_PHYSICS
     )
 
     mc_rows = load_monte_carlo(OUT / "week4b_monte_carlo_results.csv")

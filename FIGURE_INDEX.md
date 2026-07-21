@@ -105,9 +105,45 @@ outputs/rocket_flight_animation.html
 
 Physical interpretation: the animation is the time-domain counterpart to the plots. Open loop visually shows thrust-axis loss and trajectory collapse. Ideal torque isolates attitude-feedback behavior before actuator allocation. PD TVC shows finite-gimbal stabilization. LQR TVC shows improved attitude regulation and lateral drift reduction while staying inside the same gimbal limit.
 
+## 6. Estimated-State TVC Diagnostics
+
+Artifact:
+
+```text
+figures/week5-estimated-state-tvc.svg
+```
+
+Generated source:
+
+```text
+outputs/week5_estimated_tvc_plots.svg
+```
+
+Key result: estimated-state LQR TVC reaches `31.42 m` final altitude, limits maximum tilt to `10.43 deg`, keeps maximum attitude estimation error to `0.32 deg`, and uses `0.0%` gimbal saturation.
+
+Physical interpretation: this figure introduces the avionics layer. The controller no longer receives perfect attitude and angular rate; it receives gyro-derived angular rate and quaternion attitude estimated from noisy/bias-corrupted measurements. The accelerometer channel is interpreted as powered-flight specific force, not a clean gravity vector. The sub-degree attitude error shows that the estimator is accurate enough that feedback commands remain physically aligned with the true thrust axis.
+
+## 7. Truth-State vs Estimated-State Control
+
+Artifact:
+
+```text
+figures/week5-truth-vs-estimated-control.svg
+```
+
+Generated source:
+
+```text
+outputs/week5_estimated_vs_truth_control_plots.svg
+```
+
+Key result: estimated-state control closely tracks the truth-state LQR baseline: altitude, tilt, lateral drift, body-axis vertical alignment, and gimbal usage remain nearly coincident over the disturbed ascent.
+
+Physical interpretation: estimator error enters the feedback loop as apparent attitude/rate error. If the estimate drifted or lagged significantly, TVC would either under-correct the true disturbance or waste gimbal authority on false corrections. The close match shows that the modeled sensor/estimator stack preserves the same control objective within the finite TVC actuator envelope.
+
 ## Full Explanation Guide
 
-For every plot, including Week 1 baseline verification, Week 2 disturbed dynamics, Week 3A ideal torque, Week 3B TVC, Week 4A LQR, Week 4B Monte Carlo, and the animation, read:
+For every plot, including Week 1 baseline verification, Week 2 disturbed dynamics, Week 3A ideal torque, Week 3B TVC, Week 4A LQR, Week 4B Monte Carlo, Week 5 sensor/estimator feedback, and the animation, read:
 
 ```text
 docs/figure_results_interpretations.md
