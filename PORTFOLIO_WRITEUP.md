@@ -10,6 +10,16 @@ The project is structured around the same logic used in flight-dynamics and cont
 derive dynamics -> build nominal simulation -> add disturbances -> observe failure -> design controller -> model actuator -> verify robustness -> add sensors and estimated-state feedback
 ```
 
+Completed scope:
+
+| Evidence | Result |
+| --- | --- |
+| Automated verification | `37` tests passing |
+| Robustness campaign | `300` Monte Carlo cases |
+| Milestone reports | `7` generated reports with plot-level physical interpretation |
+| Visual artifacts | SVG figures and synchronized HTML animation |
+| Highest-fidelity case | Estimated/actuator-limited, variable-mass LQR TVC ascent |
+
 ## System Model
 
 The vehicle state is:
@@ -265,9 +275,8 @@ The Week 7 plots prove that the controller remains effective when mass, thrust, 
 ## Limitations
 
 - Aerodynamics use a simplified normal-force model, not full coefficient tables.
-- Mass, inertia, and thrust are constant during the simulated burn.
+- Week 7 includes time-varying mass, inertia, CM, and thrust, but uses a simplified schedule rather than detailed propellant geometry or measured engine data.
 - TVC actuator dynamics use a simplified first-order servo model rather than hardware-specific actuator data.
-- Week 7 mass properties use a simplified interpolation schedule rather than detailed propellant slosh, tank geometry, or engine data.
 - LQR is local to upright ascent and is not a global recovery controller.
 - Monte Carlo dispersions are representative for this project, not mission-certified requirements.
 
