@@ -244,6 +244,12 @@ Artifact:
 outputs/rocket_flight_animation.html
 ```
 
+Rendered browser preview:
+
+```text
+https://htmlpreview.github.io/?https://github.com/flashgari/6dof-rocket-gnc-simulator/blob/main/outputs/rocket_flight_animation.html
+```
+
 The animation is the time-domain version of the same conclusions. Open loop may visually point upward again after tumbling, but the unwrapped pitch and trajectory show that it already lost vertical thrust authority. Ideal torque isolates the feedback law. PD TVC demonstrates actuator-realistic stabilization. LQR TVC shows that a local optimal controller can reduce attitude and drift while staying inside the same gimbal authority.
 
 ## Week 5 Estimated-State TVC Plot

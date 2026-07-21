@@ -103,6 +103,12 @@ Artifact:
 outputs/rocket_flight_animation.html
 ```
 
+Rendered browser preview:
+
+```text
+https://htmlpreview.github.io/?https://github.com/flashgari/6dof-rocket-gnc-simulator/blob/main/outputs/rocket_flight_animation.html
+```
+
 Physical interpretation: the animation is the time-domain counterpart to the plots. Open loop visually shows thrust-axis loss and trajectory collapse. Ideal torque isolates attitude-feedback behavior before actuator allocation. PD TVC shows finite-gimbal stabilization. LQR TVC shows improved attitude regulation and lateral drift reduction while staying inside the same gimbal limit.
 
 ## 6. Estimated-State TVC Diagnostics

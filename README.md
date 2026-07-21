@@ -65,7 +65,9 @@ The figures are meant to show a full GNC argument, not only attractive plots. Th
 
 The project includes a standalone HTML animation generated from the simulator CSV outputs:
 
-[Open the animation artifact](outputs/rocket_flight_animation.html)
+[View the interactive animation in a browser](https://htmlpreview.github.io/?https://github.com/flashgari/6dof-rocket-gnc-simulator/blob/main/outputs/rocket_flight_animation.html)
+
+GitHub displays HTML files as source code by default. The browser-preview link above renders the animation; the repo source artifact is [outputs/rocket_flight_animation.html](outputs/rocket_flight_animation.html).
 
 The animation compares open-loop failure, ideal body-torque control, PD TVC, and LQR TVC on a synchronized timeline. It shows the rocket attitude, trajectory, body-axis vertical alignment, lateral drift, and gimbal usage in one viewer. This matters because the failure is fundamentally coupled: attitude error is not just an angular quantity, it changes the direction of the thrust force in the translational equations.
 
@@ -136,7 +138,7 @@ The variable-mass case reaches `33.32 m` final altitude, `11.21 deg` maximum til
 | [FIGURE_INDEX.md](FIGURE_INDEX.md) | Quick visual guide with numerical takeaways and physical interpretation |
 | [PORTFOLIO_WRITEUP.md](PORTFOLIO_WRITEUP.md) | Polished project narrative suitable for a portfolio page |
 | [docs/figure_results_interpretations.md](docs/figure_results_interpretations.md) | Upper-division explanation of every generated plot |
-| [outputs/rocket_flight_animation.html](outputs/rocket_flight_animation.html) | Synchronized animation of open loop, ideal torque, PD TVC, and LQR TVC |
+| [View interactive animation](https://htmlpreview.github.io/?https://github.com/flashgari/6dof-rocket-gnc-simulator/blob/main/outputs/rocket_flight_animation.html) | Browser-rendered synchronized animation of open loop, ideal torque, PD TVC, and LQR TVC |
 | [docs/week5_sensor_estimation.md](docs/week5_sensor_estimation.md) | Sensor-model and quaternion-estimator design notes |
 | [docs/week6_actuator_dynamics.md](docs/week6_actuator_dynamics.md) | Finite-bandwidth TVC actuator and authority-margin explanation |
 | [docs/week7_variable_mass.md](docs/week7_variable_mass.md) | Propellant depletion, thrust curve, shifting CM, and changing inertia explanation |
@@ -290,7 +292,8 @@ OK
 | [figures/week5-truth-vs-estimated-control.svg](figures/week5-truth-vs-estimated-control.svg) | Truth-feedback LQR vs estimated-feedback LQR comparison |
 | [figures/week6-actuator-limited-tvc.svg](figures/week6-actuator-limited-tvc.svg) | Finite-bandwidth TVC actuator, gimbal lag, and torque-authority diagnostics |
 | [figures/week7-variable-mass-ascent.svg](figures/week7-variable-mass-ascent.svg) | Thrust curve, mass depletion, changing inertia/CM, and TVC authority diagnostics |
-| [outputs/rocket_flight_animation.html](outputs/rocket_flight_animation.html) | Synchronized animation of open loop, ideal torque, PD TVC, and LQR TVC |
+| [View interactive animation](https://htmlpreview.github.io/?https://github.com/flashgari/6dof-rocket-gnc-simulator/blob/main/outputs/rocket_flight_animation.html) | Browser-rendered synchronized animation of open loop, ideal torque, PD TVC, and LQR TVC |
+| [outputs/rocket_flight_animation.html](outputs/rocket_flight_animation.html) | Source HTML artifact for local download/opening |
 | [outputs/week4b_monte_carlo_results.csv](outputs/week4b_monte_carlo_results.csv) | Trial-by-trial robustness data |
 | [outputs/week5_estimated_tvc_plots.svg](outputs/week5_estimated_tvc_plots.svg) | Sensor, estimator, and estimated-state TVC diagnostic plots |
 | [outputs/week5_estimated_vs_truth_control_plots.svg](outputs/week5_estimated_vs_truth_control_plots.svg) | Truth-feedback LQR vs estimated-feedback LQR comparison |

@@ -56,7 +56,8 @@ For a recruiter or engineer reviewing quickly:
 4. Open `figures/week4a-lqr-control-comparison.svg`.
 5. Open `figures/week6-actuator-limited-tvc.svg`.
 6. Open `figures/week7-variable-mass-ascent.svg`.
-7. Open `outputs/rocket_flight_animation.html`.
+7. Open the rendered animation preview:
+   `https://htmlpreview.github.io/?https://github.com/flashgari/6dof-rocket-gnc-simulator/blob/main/outputs/rocket_flight_animation.html`
 8. Read `PORTFOLIO_WRITEUP.md`.
 9. Read `docs/figure_results_interpretations.md` for plot-by-plot physics.
 

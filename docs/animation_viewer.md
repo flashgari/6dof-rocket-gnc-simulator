@@ -6,6 +6,14 @@ The animation viewer is a standalone portfolio artifact generated from the simul
 outputs/rocket_flight_animation.html
 ```
 
+GitHub shows `.html` files as source code when clicked directly. Use this rendered preview link for browser playback:
+
+```text
+https://htmlpreview.github.io/?https://github.com/flashgari/6dof-rocket-gnc-simulator/blob/main/outputs/rocket_flight_animation.html
+```
+
+The direct file path remains useful for downloading the artifact and opening it locally in a browser.
+
 It compares four cases on a synchronized time base:
 
 - Week 2 open-loop disturbed ascent
