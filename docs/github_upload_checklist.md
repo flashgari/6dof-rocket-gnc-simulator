@@ -20,11 +20,13 @@ Use this before publishing the repository.
 - [x] `outputs/week3b_control_comparison_plots.svg`
 - [x] `outputs/week4a_lqr_control_comparison_plots.svg`
 - [x] `outputs/week4b_monte_carlo_summary.svg`
+- [x] `outputs/week6_actuator_limited_tvc_plots.svg`
 - [x] `outputs/rocket_flight_animation.html`
 - [x] `figures/week2-open-loop-failure.svg`
 - [x] `figures/week3b-control-comparison.svg`
 - [x] `figures/week4a-lqr-control-comparison.svg`
 - [x] `figures/week4b-monte-carlo-robustness.svg`
+- [x] `figures/week6-actuator-limited-tvc.svg`
 - [x] `docs/figure_results_interpretations.md`
 
 ## Verification Command
@@ -38,7 +40,7 @@ python3 scripts/run_all.py
 Expected result:
 
 ```text
-Ran 28 tests
+Ran 33 tests
 OK
 ```
 
@@ -50,9 +52,10 @@ For a recruiter or engineer reviewing quickly:
 2. Read `FIGURE_INDEX.md`.
 3. Open `figures/week4b-monte-carlo-robustness.svg`.
 4. Open `figures/week4a-lqr-control-comparison.svg`.
-5. Open `outputs/rocket_flight_animation.html`.
-6. Read `PORTFOLIO_WRITEUP.md`.
-7. Read `docs/figure_results_interpretations.md` for plot-by-plot physics.
+5. Open `figures/week6-actuator-limited-tvc.svg`.
+6. Open `outputs/rocket_flight_animation.html`.
+7. Read `PORTFOLIO_WRITEUP.md`.
+8. Read `docs/figure_results_interpretations.md` for plot-by-plot physics.
 
 ## Interview Prep
 
@@ -66,3 +69,4 @@ Be ready to explain:
 - why ideal torque is not actuator-realistic
 - why LQR is local
 - why Monte Carlo robustness matters
+- why finite TVC bandwidth changes phase margin and actuator authority

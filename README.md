@@ -2,7 +2,7 @@
 
 [![tests](https://github.com/flashgari/6dof-rocket-gnc-simulator/actions/workflows/test.yml/badge.svg)](https://github.com/flashgari/6dof-rocket-gnc-simulator/actions/workflows/test.yml)
 
-This repository is a controls/GNC portfolio project for launch-vehicle ascent dynamics. It implements a nonlinear 6-DOF rigid-body rocket simulation, introduces aerodynamic and propulsion disturbances, demonstrates open-loop instability, stabilizes the vehicle with attitude feedback, allocates control through thrust vector control, compares PD and LQR control laws, and verifies robustness with a Monte Carlo dispersion campaign.
+This repository is a controls/GNC portfolio project for launch-vehicle ascent dynamics. It implements a nonlinear 6-DOF rigid-body rocket simulation, introduces aerodynamic and propulsion disturbances, demonstrates open-loop instability, stabilizes the vehicle with attitude feedback, allocates control through thrust vector control, compares PD and LQR control laws, adds sensor-based attitude estimation, checks finite-bandwidth TVC actuator dynamics, and verifies robustness with a Monte Carlo dispersion campaign.
 
 The project is intentionally written as an engineering artifact: the code, plots, animation, tests, and writeups are organized so a reviewer can trace the work from first-principles dynamics to closed-loop verification.
 
@@ -13,7 +13,8 @@ The project is intentionally written as an engineering artifact: the code, plots
 | Dynamics | 13-state nonlinear rigid-body model: inertial position, velocity, quaternion attitude, and body angular velocity |
 | Integration | Fixed-step RK4 with quaternion normalization and sanity tests |
 | Disturbances | Crosswind, thrust misalignment, thrust offset, drag, angle-of-attack normal force, and CP/CM moment arm |
-| Control | Ideal body-torque PD, actuator-realistic PD TVC, LQR TVC, and estimated-state LQR TVC |
+| Control | Ideal body-torque PD, actuator-realistic PD TVC, LQR TVC, estimated-state LQR TVC, and actuator-limited LQR TVC |
+| Actuation | TVC allocation, gimbal envelope, first-order servo lag, slew-rate limits, commanded-vs-achieved gimbal tracking, and torque-authority margin |
 | Avionics | Noisy IMU model, low-rate attitude reference, quaternion attitude estimator, and sensor-driven feedback |
 | Verification | Nominal controlled/uncontrolled comparisons, estimated-state control comparison, and 300-case Monte Carlo campaign |
 | Presentation | SVG plots, CSV outputs, milestone reports, synchronized HTML animation, and upper-division physics explanations |
@@ -29,6 +30,8 @@ Nominal disturbed ascent over a `3 s` simulation window:
 | PD TVC | 30.97 m | 12.94 deg | 13.24 m | 0.0% |
 | LQR TVC | 31.43 m | 10.30 deg | 10.73 m | 0.0% |
 | Estimated-state LQR TVC | 31.42 m | 10.43 deg | 10.83 m | 0.0% |
+| Actuator-limited LQR TVC | 31.42 m | 11.09 deg | 10.67 m | 0.0% |
+| Estimated actuator-limited LQR TVC | 31.43 m | 10.91 deg | 10.58 m | 0.0% |
 
 Monte Carlo robustness campaign with `100` randomized dispersions per controller:
 
@@ -82,6 +85,21 @@ The accelerometer is modeled as body-frame specific force, `f_B = R_IB(q)(a_I - 
 
 The estimated-state controller remains close to the truth-state LQR baseline: maximum attitude estimation error is `0.32 deg`, RMS attitude estimation error is `0.17 deg`, and gimbal saturation remains `0.0%`. The control implication is that sensor noise and bias are small enough, after estimation, that the TVC loop remains inside the modeled attitude corridor and actuator envelope.
 
+## Actuator-Limited TVC
+
+Week 6 adds finite TVC actuator dynamics. The controller can request a nozzle angle, but the plant only receives the achieved angle after first-order servo lag, slew-rate limiting, and the hard gimbal envelope:
+
+```text
+delta_dot_cmd = (delta_cmd - delta_act) / tau_servo
+|delta_dot_act| <= delta_dot_max
+|delta_act| <= delta_max
+tau_TVC = r_engine x F(delta_act)
+```
+
+![Actuator-limited TVC plots](figures/week6-actuator-limited-tvc.svg)
+
+This is a controls-stability check, not just a mechanical add-on. Finite actuator bandwidth inserts phase lag between attitude error and corrective moment. If the nozzle moves too slowly, the controller applies torque to an older attitude/rate state, reducing damping and phase margin. In the nominal Week 6 case, actuator-limited LQR remains stable: maximum tilt is `11.09 deg` for truth-state feedback and `10.91 deg` for estimated-state feedback. The peak gimbal lag is about `1.50 deg`, rate limiting remains `0.0%`, and torque-authority margin remains positive. That means the controller is not relying on instant or impossible nozzle motion to preserve thrust-axis alignment.
+
 ## Review Path
 
 | Start here | Purpose |
@@ -91,6 +109,7 @@ The estimated-state controller remains close to the truth-state LQR baseline: ma
 | [docs/figure_results_interpretations.md](docs/figure_results_interpretations.md) | Upper-division explanation of every generated plot |
 | [outputs/rocket_flight_animation.html](outputs/rocket_flight_animation.html) | Synchronized animation of open loop, ideal torque, PD TVC, and LQR TVC |
 | [docs/week5_sensor_estimation.md](docs/week5_sensor_estimation.md) | Sensor-model and quaternion-estimator design notes |
+| [docs/week6_actuator_dynamics.md](docs/week6_actuator_dynamics.md) | Finite-bandwidth TVC actuator and authority-margin explanation |
 | [outputs/week4b_monte_carlo_results.csv](outputs/week4b_monte_carlo_results.csv) | Trial-by-trial robustness data |
 
 ## Flight Physics
@@ -171,6 +190,18 @@ The `Q/R` weighting changes the trade between attitude/rate error and control ef
 
 Week 5 adds the distinction between truth-state control and estimated-state control. Gyro bias and noise corrupt angular-rate feedback, accelerometer measurements reflect powered-flight specific force, and attitude reference updates arrive at a lower rate than the dynamics integration. The controller therefore acts on `q_hat` and `omega_hat`, not on the true plant state. This tests whether estimation error remains small enough that the LQR TVC controller still preserves thrust-axis alignment without overusing gimbal authority.
 
+**Actuator Dynamics And Stability Margin**
+
+`delta_dot_cmd = (delta_cmd - delta_act) / tau_servo`
+
+`|delta_dot_act| <= delta_dot_max`
+
+`|delta_act| <= delta_max`
+
+Instantaneous TVC hides an important closed-loop effect: the controller's requested moment is not necessarily the moment applied to the vehicle. A real gimbal has bandwidth, rate limits, and position limits. These limits create phase lag and amplitude loss between the requested lateral thrust vector and the achieved lateral thrust vector. Since pitch/yaw stabilization depends on timely corrective moment, actuator lag can reduce damping or destabilize an otherwise acceptable controller.
+
+The Week 6 actuator diagnostics therefore track commanded gimbal, achieved gimbal, gimbal lag error, rate-limit fraction, position-limit fraction, and torque-authority margin. This connects the software controller to physical actuator feasibility. A positive margin under `tau_max,TVC ~= L T sin(delta_max)` means the controller's requested moment fits inside the modeled engine-gimbal authority. The nominal actuator-limited result shows a visible but bounded `1.50 deg` gimbal lag, no rate limiting, and stable thrust-axis alignment, so the LQR controller retains practical margin beyond the ideal-TVC assumption.
+
 ## How To Run
 
 The project uses only the Python standard library.
@@ -190,7 +221,7 @@ python3 -m unittest discover -s tests
 Current verification:
 
 ```text
-Ran 28 tests
+Ran 33 tests
 OK
 ```
 
@@ -203,10 +234,12 @@ OK
 | [figures/week4a-lqr-control-comparison.svg](figures/week4a-lqr-control-comparison.svg) | Open loop vs ideal torque vs PD TVC vs LQR TVC comparison |
 | [figures/week5-estimated-state-tvc.svg](figures/week5-estimated-state-tvc.svg) | Recruiter-facing sensor, estimator, and estimated-state TVC diagnostics |
 | [figures/week5-truth-vs-estimated-control.svg](figures/week5-truth-vs-estimated-control.svg) | Truth-feedback LQR vs estimated-feedback LQR comparison |
+| [figures/week6-actuator-limited-tvc.svg](figures/week6-actuator-limited-tvc.svg) | Finite-bandwidth TVC actuator, gimbal lag, and torque-authority diagnostics |
 | [outputs/rocket_flight_animation.html](outputs/rocket_flight_animation.html) | Synchronized animation of open loop, ideal torque, PD TVC, and LQR TVC |
 | [outputs/week4b_monte_carlo_results.csv](outputs/week4b_monte_carlo_results.csv) | Trial-by-trial robustness data |
 | [outputs/week5_estimated_tvc_plots.svg](outputs/week5_estimated_tvc_plots.svg) | Sensor, estimator, and estimated-state TVC diagnostic plots |
 | [outputs/week5_estimated_vs_truth_control_plots.svg](outputs/week5_estimated_vs_truth_control_plots.svg) | Truth-feedback LQR vs estimated-feedback LQR comparison |
+| [outputs/week6_actuator_limited_tvc_plots.svg](outputs/week6_actuator_limited_tvc_plots.svg) | Actuator-limited TVC comparison and authority-margin plots |
 | [FIGURE_INDEX.md](FIGURE_INDEX.md) | Fast visual guide with numerical takeaways and physical interpretations |
 | [docs/figure_results_interpretations.md](docs/figure_results_interpretations.md) | Upper-division explanation of every generated graph |
 
@@ -284,10 +317,21 @@ omega_dot = tau / I
 - Estimated-state LQR TVC feedback
 - True-vs-estimated attitude, rate, sensor, and gimbal plots
 
+### Week 6: Actuator Dynamics And Control Authority
+
+- First-order TVC gimbal response
+- Maximum gimbal angle and slew-rate constraints
+- Commanded vs achieved nozzle deflection
+- Gimbal lag error and actuator saturation telemetry
+- Required torque vs available `L T sin(delta_max)` TVC authority
+- Truth-state and estimated-state actuator-limited LQR comparison
+
 ## Repository Layout
 
 ```text
 rocket_sim/
+  actuator_sim.py    actuator-limited closed-loop simulation loops
+  actuators.py       finite-bandwidth TVC actuator model
   analysis.py        derived metrics and physical summary quantities
   control.py         ideal torque, TVC, and LQR controllers
   controlled_sim.py  ideal-torque closed-loop integration
@@ -305,6 +349,8 @@ scripts/
   run_week3b_tvc_ascent.py
   run_week4a_lqr_tvc_ascent.py
   run_week4b_monte_carlo.py
+  run_week5_estimated_tvc_ascent.py
+  run_week6_actuator_limited_tvc.py
   plot_outputs.py
   write_reports.py
   build_animation.py
@@ -315,6 +361,8 @@ tests/
   test_week3b_tvc.py
   test_week4a_lqr.py
   test_week4b_monte_carlo.py
+  test_week5_estimation.py
+  test_week6_actuators.py
 docs/
   technical_physics_notes.md
   figure_results_interpretations.md
@@ -325,6 +373,7 @@ docs/
   week4a_lqr_control.md
   week4b_monte_carlo.md
   week5_sensor_estimation.md
+  week6_actuator_dynamics.md
   animation_viewer.md
 outputs/
   generated CSV, SVG, HTML, and milestone reports
@@ -338,9 +387,9 @@ FIGURE_INDEX.md
 
 - Aerodynamics use a simplified normal-force model rather than full coefficient tables.
 - Mass, inertia, and thrust are constant during the burn.
-- TVC dynamics are instantaneous; actuator rate limits and servo dynamics are not yet modeled.
+- TVC actuator dynamics use a simplified first-order servo model rather than hardware-specific actuator data.
 - LQR is designed around the upright operating point and is not a global tumble-recovery controller.
-- Future extensions: gyro-bias estimation, translational Kalman filtering, actuator rate limits, gain scheduling, and higher-fidelity atmosphere/aerodynamics.
+- Future extensions: gyro-bias estimation, translational Kalman filtering, mass depletion, gain scheduling, and higher-fidelity atmosphere/aerodynamics.
 
 ## Interview Talking Points
 
@@ -351,3 +400,4 @@ FIGURE_INDEX.md
 - Why ideal torque is useful for control-law verification but not actuator-realistic.
 - Why LQR is local and must be verified in the nonlinear plant.
 - Why Monte Carlo robustness is stronger evidence than one nominal trajectory.
+- Why finite TVC bandwidth affects phase margin and moment authority.

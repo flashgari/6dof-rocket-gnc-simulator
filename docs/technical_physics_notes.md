@@ -200,3 +200,34 @@ f_B = R_IB(q)(a_I - g_I)
 This is not the same as a gravity direction measurement during powered ascent. Since thrust and aerodynamic loads dominate `f_B`, an accelerometer-only attitude correction would tend to align with the thrust environment rather than with inertial down. That is why Week 5 uses a low-rate attitude reference for correction and treats accelerometer outputs as logged avionics measurements.
 
 Estimated-state feedback matters because estimator error enters the TVC loop as a false attitude/rate error. If `q_hat` lags or drifts, the controller may command moment in the wrong direction or waste gimbal authority. The Week 5 results show sub-degree attitude estimation error and zero gimbal saturation, so the estimator is accurate enough for the LQR TVC controller to preserve thrust-axis alignment in the nominal disturbed ascent.
+
+## Week 6 Actuator Dynamics Physics
+
+Week 6 changes the actuator assumption. Earlier TVC cases treat gimbal commands as instantaneously achieved. Week 6 separates controller request from actuator response:
+
+```text
+delta_dot_cmd = (delta_cmd - delta_act) / tau_servo
+|delta_dot_act| <= delta_dot_max
+|delta_act| <= delta_max
+tau_TVC = r_engine x F(delta_act)
+```
+
+The distinction matters because closed-loop attitude control depends on when the corrective moment arrives, not only on whether the correct moment was requested. A finite-bandwidth gimbal inserts phase lag into the loop. In a transverse rigid-body channel,
+
+```text
+theta_dot = omega
+I omega_dot = tau_TVC + tau_dist
+```
+
+late torque reduces damping effectiveness. With enough lag, the controller can apply moment after the state has moved, reducing phase margin or even adding rotational energy instead of dissipating it. This is why actuator dynamics are part of GNC stability analysis rather than a cosmetic mechanical detail.
+
+The Week 6 nominal result shows bounded actuator lag instead of control failure. Truth-state actuator-limited LQR reaches `11.09 deg` maximum tilt, and estimated-state actuator-limited LQR reaches `10.91 deg`. The maximum gimbal lag is about `1.50 deg`, with `0.0%` rate-limit fraction. That means the first-order lag is visible in the actuator telemetry but does not push the nominal case into slew-rate saturation.
+
+Torque authority is checked through:
+
+```text
+tau_max,TVC ~= L T sin(delta_max)
+tau_margin = tau_max,TVC - |tau_requested|
+```
+
+Positive torque margin means the controller remains inside the available moment envelope. This is the key aerospace-controls interpretation: Week 6 verifies not just that the LQR law stabilizes the math model, but that it remains feasible after the moment command is filtered through nozzle bandwidth, gimbal limits, and estimated-state feedback.

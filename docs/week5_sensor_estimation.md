@@ -81,4 +81,4 @@ estimation error cannot simply be overcome by arbitrary gain. If estimated attit
 - Add gyro-bias estimation instead of assuming preflight bias calibration.
 - Add barometer/GPS measurements and a translational Kalman filter.
 - Add delayed measurements and estimator latency.
-- Add actuator rate limits so estimation lag and gimbal dynamics are tested together.
+- Couple the estimator to higher-fidelity actuator hardware data and guidance commands beyond vertical ascent.

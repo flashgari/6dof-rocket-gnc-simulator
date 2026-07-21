@@ -177,6 +177,36 @@ The LQR TVC controller then uses `q_hat` and `omega_hat` instead of truth attitu
 
 The physical takeaway is that sensor noise and bias do not automatically invalidate a controller, but they become part of the feedback loop. Estimation lag or drift would appear as false attitude/rate error and could waste gimbal authority or inject lateral thrust. In this case, the estimator error remains small enough for the TVC controller to preserve the same thrust-axis alignment objective as the truth-state LQR baseline.
 
+## Actuator Dynamics And Control Authority
+
+Week 6 adds finite-bandwidth TVC dynamics. This closes another major realism gap: the controller no longer gets to tilt the thrust vector instantaneously. It requests a gimbal angle, while the plant receives the achieved nozzle deflection after first-order lag, slew-rate limiting, and hard position limiting:
+
+```text
+delta_dot_cmd = (delta_cmd - delta_act) / tau_servo
+|delta_dot_act| <= delta_dot_max
+|delta_act| <= delta_max
+tau_TVC = r_engine x F(delta_act)
+```
+
+This is a stability-margin issue. In the local pitch/yaw dynamics, the controller is trying to damp angular rate and restore thrust-axis alignment:
+
+```text
+theta_dot = omega
+I omega_dot = tau_TVC + tau_dist
+```
+
+If the actuator is slow, the stabilizing moment is applied late. That lag reduces phase margin and can turn an otherwise good rigid-body controller into an oscillatory or saturated loop. Week 6 therefore logs commanded gimbal, achieved gimbal, gimbal lag error, rate-limit fraction, position-limit fraction, and torque-authority margin.
+
+The nominal actuator-limited LQR case reaches final altitude `31.42 m`, limits maximum tilt to `11.09 deg`, and limits lateral drift to `10.67 m`. The estimated-state actuator-limited case reaches `31.43 m`, limits maximum tilt to `10.91 deg`, and limits lateral drift to `10.58 m`. Peak gimbal lag is about `1.50 deg`, and rate-limit fraction remains `0.0%`.
+
+The physical interpretation is that the actuator lag is visible but not destabilizing for this nominal case. The controller still remains inside the TVC authority envelope:
+
+```text
+tau_max,TVC ~= L T sin(delta_max)
+```
+
+so the stabilized response is not being purchased by impossible moment commands. This result makes the project more flight-relevant because it ties the control law to actuator bandwidth and achievable torque, not just ideal feedback math.
+
 ## What The Plots Prove
 
 The Week 2 plots prove the failure mechanism: disturbance moments rotate the thrust axis, and the trajectory fails because thrust projection changes.
@@ -191,17 +221,18 @@ The Week 4B plot proves robustness statistically over a defined dispersion set, 
 
 The Week 5 plots prove that the controller remains effective when driven by estimated attitude and angular rate rather than perfect truth-state feedback.
 
+The Week 6 plots prove that the controller remains effective when the TVC actuator has finite bandwidth and the plant receives achieved gimbal angle rather than requested gimbal angle.
+
 ## Limitations
 
 - Aerodynamics use a simplified normal-force model, not full coefficient tables.
 - Mass, inertia, and thrust are constant during the simulated burn.
-- TVC is instantaneous; actuator rate limits and servo dynamics are not modeled.
+- TVC actuator dynamics use a simplified first-order servo model rather than hardware-specific actuator data.
 - LQR is local to upright ascent and is not a global recovery controller.
 - Monte Carlo dispersions are representative for this project, not mission-certified requirements.
 
 ## Next Improvements
 
-- Add actuator rate limits and gimbal dynamics.
 - Add gyro-bias estimation and estimator latency.
 - Add translational GPS/barometer measurements and Kalman filtering.
 - Add mass depletion and time-varying inertia.
@@ -219,3 +250,4 @@ The Week 5 plots prove that the controller remains effective when driven by esti
 - LQR is designed on a local linear model and must be verified on the nonlinear plant.
 - Monte Carlo analysis demonstrates robustness over uncertainty, not just nominal performance.
 - Estimated-state feedback connects controls to avionics by showing how sensor bias/noise and attitude estimation affect TVC commands.
+- Actuator dynamics connect controls to hardware feasibility by showing how gimbal bandwidth, phase lag, and torque-authority margin affect the same TVC loop.
