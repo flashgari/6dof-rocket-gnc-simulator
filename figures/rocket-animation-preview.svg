@@ -5,12 +5,17 @@
   <rect x="32" y="28" width="1056" height="464" rx="10" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
   <text x="56" y="70" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700" fill="#111827">Interactive 6-DOF Flight Animation</text>
   <text x="56" y="100" font-family="Arial, Helvetica, sans-serif" font-size="17" fill="#475569">Synchronized playback of open-loop failure, ideal body-torque control, PD TVC, and LQR TVC.</text>
+  <text x="912" y="72" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#2563eb">animated README preview</text>
 
   <rect x="56" y="126" width="86" height="42" rx="7" fill="#ffffff" stroke="#334155" stroke-width="2"/>
   <text x="85" y="153" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#111827">Play</text>
   <line x1="170" y1="147" x2="820" y2="147" stroke="#cbd5e1" stroke-width="10" stroke-linecap="round"/>
-  <line x1="170" y1="147" x2="620" y2="147" stroke="#2563eb" stroke-width="10" stroke-linecap="round"/>
-  <circle cx="620" cy="147" r="16" fill="#2563eb"/>
+  <line x1="170" y1="147" x2="620" y2="147" stroke="#2563eb" stroke-width="10" stroke-linecap="round">
+    <animate attributeName="x2" values="170;820;170" dur="6s" repeatCount="indefinite"/>
+  </line>
+  <circle cx="620" cy="147" r="16" fill="#2563eb">
+    <animate attributeName="cx" values="170;820;170" dur="6s" repeatCount="indefinite"/>
+  </circle>
   <text x="846" y="154" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700" fill="#475569">t = 2.96 s</text>
 
   <g transform="translate(56,198)">
@@ -18,6 +23,7 @@
     <text x="0" y="22" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#475569">disturbed tumble</text>
     <path d="M22 238 C 92 150, 220 145, 278 238" fill="none" stroke="#dc2626" stroke-width="3"/>
     <g transform="translate(52,202) rotate(-13)">
+      <animateTransform attributeName="transform" type="rotate" additive="sum" values="0;70;180;300;360" dur="6s" repeatCount="indefinite"/>
       <rect x="-8" y="-34" width="16" height="68" fill="#ef4444" stroke="#991b1b" stroke-width="2"/>
       <polygon points="0,-48 -12,-30 12,-30" fill="#dc2626" stroke="#991b1b" stroke-width="2"/>
     </g>
@@ -31,6 +37,7 @@
     <text x="0" y="22" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#475569">direct attitude moment</text>
     <path d="M156 238 C 160 168, 160 96, 156 44" fill="none" stroke="#2563eb" stroke-width="3"/>
     <g transform="translate(156,62) rotate(-1)">
+      <animateTransform attributeName="transform" type="rotate" additive="sum" values="-2;2;-1;1;-2" dur="6s" repeatCount="indefinite"/>
       <rect x="-8" y="-34" width="16" height="68" fill="#60a5fa" stroke="#1e40af" stroke-width="2"/>
       <polygon points="0,-48 -12,-30 12,-30" fill="#2563eb" stroke="#1e40af" stroke-width="2"/>
     </g>
@@ -44,9 +51,12 @@
     <text x="0" y="22" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#475569">finite gimbal authority</text>
     <path d="M164 238 C 148 170, 134 104, 120 54" fill="none" stroke="#059669" stroke-width="3"/>
     <g transform="translate(120,70) rotate(-9)">
+      <animateTransform attributeName="transform" type="rotate" additive="sum" values="-7;4;-3;2;-7" dur="6s" repeatCount="indefinite"/>
       <rect x="-8" y="-34" width="16" height="68" fill="#34d399" stroke="#065f46" stroke-width="2"/>
       <polygon points="0,-48 -12,-30 12,-30" fill="#059669" stroke="#065f46" stroke-width="2"/>
-      <line x1="0" y1="38" x2="-22" y2="78" stroke="#7c3aed" stroke-width="4" marker-end="url(#arrow)"/>
+      <line x1="0" y1="38" x2="-22" y2="78" stroke="#7c3aed" stroke-width="4" marker-end="url(#arrow)">
+        <animate attributeName="opacity" values="0.35;1;0.55;1;0.35" dur="6s" repeatCount="indefinite"/>
+      </line>
     </g>
     <rect x="0" y="260" width="300" height="54" fill="#ffffff" stroke="#e2e8f0" stroke-width="2"/>
     <path d="M0 260 C 18 314, 44 273, 86 298 S 198 300, 300 290" fill="none" stroke="#7c3aed" stroke-width="3"/>

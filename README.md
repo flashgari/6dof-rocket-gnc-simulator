@@ -1,5 +1,7 @@
 # 6-DOF Rocket Flight Simulator with TVC, LQR, and Monte Carlo Verification
 
+[![tests](https://github.com/flashgari/6dof-rocket-gnc-simulator/actions/workflows/test.yml/badge.svg)](https://github.com/flashgari/6dof-rocket-gnc-simulator/actions/workflows/test.yml)
+
 This repository is a controls/GNC portfolio project for launch-vehicle ascent dynamics. It implements a nonlinear 6-DOF rigid-body rocket simulation, introduces aerodynamic and propulsion disturbances, demonstrates open-loop instability, stabilizes the vehicle with attitude feedback, allocates control through thrust vector control, compares PD and LQR control laws, and verifies robustness with a Monte Carlo dispersion campaign.
 
 The project is intentionally written as an engineering artifact: the code, plots, animation, tests, and writeups are organized so a reviewer can trace the work from first-principles dynamics to closed-loop verification.
