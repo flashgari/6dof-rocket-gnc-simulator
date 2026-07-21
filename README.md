@@ -15,6 +15,7 @@ The project is intentionally written as an engineering artifact: the code, plots
 | Disturbances | Crosswind, thrust misalignment, thrust offset, drag, angle-of-attack normal force, and CP/CM moment arm |
 | Control | Ideal body-torque PD, actuator-realistic PD TVC, LQR TVC, estimated-state LQR TVC, and actuator-limited LQR TVC |
 | Actuation | TVC allocation, gimbal envelope, first-order servo lag, slew-rate limits, commanded-vs-achieved gimbal tracking, and torque-authority margin |
+| Propulsion | Thrust curve, impulse-based propellant depletion, time-varying mass, shifting CM, and changing inertia |
 | Avionics | Noisy IMU model, low-rate attitude reference, quaternion attitude estimator, and sensor-driven feedback |
 | Verification | Nominal controlled/uncontrolled comparisons, estimated-state control comparison, and 300-case Monte Carlo campaign |
 | Presentation | SVG plots, CSV outputs, milestone reports, synchronized HTML animation, and upper-division physics explanations |
@@ -32,6 +33,7 @@ Nominal disturbed ascent over a `3 s` simulation window:
 | Estimated-state LQR TVC | 31.42 m | 10.43 deg | 10.83 m | 0.0% |
 | Actuator-limited LQR TVC | 31.42 m | 11.09 deg | 10.67 m | 0.0% |
 | Estimated actuator-limited LQR TVC | 31.43 m | 10.91 deg | 10.58 m | 0.0% |
+| Variable-mass actuator-limited LQR TVC | 33.32 m | 11.21 deg | 11.12 m | 0.0% |
 
 Monte Carlo robustness campaign with `100` randomized dispersions per controller:
 
@@ -100,6 +102,21 @@ tau_TVC = r_engine x F(delta_act)
 
 This is a controls-stability check, not just a mechanical add-on. Finite actuator bandwidth inserts phase lag between attitude error and corrective moment. If the nozzle moves too slowly, the controller applies torque to an older attitude/rate state, reducing damping and phase margin. In the nominal Week 6 case, actuator-limited LQR remains stable: maximum tilt is `11.09 deg` for truth-state feedback and `10.91 deg` for estimated-state feedback. The peak gimbal lag is about `1.50 deg`, rate limiting remains `0.0%`, and torque-authority margin remains positive. That means the controller is not relying on instant or impossible nozzle motion to preserve thrust-axis alignment.
 
+## Variable-Mass Powered Ascent
+
+Week 7 adds a propulsion/mass-property schedule: thrust varies with time, propellant depletion is computed from impulse and specific impulse, the center of mass shifts, and inertia changes during the burn.
+
+```text
+m_dot = -T / (Isp g0)
+a_thrust = T(t) / m(t)
+I(t) omega_dot + omega x (I(t) omega) = tau
+tau_max,TVC(t) ~= L T(t) sin(delta_max)
+```
+
+![Variable-mass ascent plots](figures/week7-variable-mass-ascent.svg)
+
+The variable-mass case reaches `33.32 m` final altitude, `11.21 deg` maximum tilt, and `11.12 m` maximum lateral drift. Mass decreases from `50.00 kg` to `48.93 kg`, transverse inertia decreases from `3.15` to `3.07 kg m^2`, and CM moves from `-0.080 m` to `-0.056 m`. The result is physically important because changing mass properties alter both sides of the control problem: translational acceleration changes through `T/m`, rotational response changes through `I(t)`, aerodynamic moment arms change through `r_CP - r_CM(t)`, and TVC authority changes through thrust. The fixed LQR gains still hold the vehicle inside the attitude corridor, which motivates gain scheduling as the next serious controls extension.
+
 ## Review Path
 
 | Start here | Purpose |
@@ -110,6 +127,7 @@ This is a controls-stability check, not just a mechanical add-on. Finite actuato
 | [outputs/rocket_flight_animation.html](outputs/rocket_flight_animation.html) | Synchronized animation of open loop, ideal torque, PD TVC, and LQR TVC |
 | [docs/week5_sensor_estimation.md](docs/week5_sensor_estimation.md) | Sensor-model and quaternion-estimator design notes |
 | [docs/week6_actuator_dynamics.md](docs/week6_actuator_dynamics.md) | Finite-bandwidth TVC actuator and authority-margin explanation |
+| [docs/week7_variable_mass.md](docs/week7_variable_mass.md) | Propellant depletion, thrust curve, shifting CM, and changing inertia explanation |
 | [outputs/week4b_monte_carlo_results.csv](outputs/week4b_monte_carlo_results.csv) | Trial-by-trial robustness data |
 
 ## Flight Physics
@@ -202,6 +220,18 @@ Instantaneous TVC hides an important closed-loop effect: the controller's reques
 
 The Week 6 actuator diagnostics therefore track commanded gimbal, achieved gimbal, gimbal lag error, rate-limit fraction, position-limit fraction, and torque-authority margin. This connects the software controller to physical actuator feasibility. A positive margin under `tau_max,TVC ~= L T sin(delta_max)` means the controller's requested moment fits inside the modeled engine-gimbal authority. The nominal actuator-limited result shows a visible but bounded `1.50 deg` gimbal lag, no rate limiting, and stable thrust-axis alignment, so the LQR controller retains practical margin beyond the ideal-TVC assumption.
 
+**Variable Mass, Thrust Curve, And Gain Scheduling Motivation**
+
+`m_dot = -T / (Isp g0)`
+
+`a_thrust = T(t) / m(t)`
+
+`I(t) omega_dot + omega x (I(t) omega) = tau`
+
+Propellant depletion couples propulsion to both translation and rotation. As mass decreases, the same thrust produces larger acceleration unless the thrust curve falls enough to offset it. As inertia changes, the same TVC or aerodynamic moment produces a different angular acceleration. As CM shifts, the CP/CM moment arm changes, so the aerodynamic disturbance moment is time-varying. These are exactly the effects that make ascent GNC a scheduled-control problem rather than a single fixed-plant exercise.
+
+Week 7 keeps the LQR gains fixed and asks whether the controller still has enough margin as `m(t)`, `I(t)`, `r_CM(t)`, and `T(t)` vary. The vehicle remains stable, but the changing response motivates gain scheduling versus dynamic pressure, mass state, and thrust level.
+
 ## How To Run
 
 The project uses only the Python standard library.
@@ -221,7 +251,7 @@ python3 -m unittest discover -s tests
 Current verification:
 
 ```text
-Ran 33 tests
+Ran 37 tests
 OK
 ```
 
@@ -235,11 +265,13 @@ OK
 | [figures/week5-estimated-state-tvc.svg](figures/week5-estimated-state-tvc.svg) | Recruiter-facing sensor, estimator, and estimated-state TVC diagnostics |
 | [figures/week5-truth-vs-estimated-control.svg](figures/week5-truth-vs-estimated-control.svg) | Truth-feedback LQR vs estimated-feedback LQR comparison |
 | [figures/week6-actuator-limited-tvc.svg](figures/week6-actuator-limited-tvc.svg) | Finite-bandwidth TVC actuator, gimbal lag, and torque-authority diagnostics |
+| [figures/week7-variable-mass-ascent.svg](figures/week7-variable-mass-ascent.svg) | Thrust curve, mass depletion, changing inertia/CM, and TVC authority diagnostics |
 | [outputs/rocket_flight_animation.html](outputs/rocket_flight_animation.html) | Synchronized animation of open loop, ideal torque, PD TVC, and LQR TVC |
 | [outputs/week4b_monte_carlo_results.csv](outputs/week4b_monte_carlo_results.csv) | Trial-by-trial robustness data |
 | [outputs/week5_estimated_tvc_plots.svg](outputs/week5_estimated_tvc_plots.svg) | Sensor, estimator, and estimated-state TVC diagnostic plots |
 | [outputs/week5_estimated_vs_truth_control_plots.svg](outputs/week5_estimated_vs_truth_control_plots.svg) | Truth-feedback LQR vs estimated-feedback LQR comparison |
 | [outputs/week6_actuator_limited_tvc_plots.svg](outputs/week6_actuator_limited_tvc_plots.svg) | Actuator-limited TVC comparison and authority-margin plots |
+| [outputs/week7_variable_mass_plots.svg](outputs/week7_variable_mass_plots.svg) | Variable-mass powered-ascent comparison and mass-property plots |
 | [FIGURE_INDEX.md](FIGURE_INDEX.md) | Fast visual guide with numerical takeaways and physical interpretations |
 | [docs/figure_results_interpretations.md](docs/figure_results_interpretations.md) | Upper-division explanation of every generated graph |
 
@@ -326,6 +358,15 @@ omega_dot = tau / I
 - Required torque vs available `L T sin(delta_max)` TVC authority
 - Truth-state and estimated-state actuator-limited LQR comparison
 
+### Week 7: Variable-Mass Powered Ascent
+
+- Piecewise-linear thrust curve
+- Propellant depletion from `m_dot = -T / (Isp g0)`
+- Time-varying mass, inertia, and center of mass
+- `T/m` acceleration diagnostics
+- Thrust-dependent TVC authority margin
+- Constant-mass vs variable-mass actuator-limited LQR comparison
+
 ## Repository Layout
 
 ```text
@@ -351,6 +392,7 @@ scripts/
   run_week4b_monte_carlo.py
   run_week5_estimated_tvc_ascent.py
   run_week6_actuator_limited_tvc.py
+  run_week7_variable_mass_ascent.py
   plot_outputs.py
   write_reports.py
   build_animation.py
@@ -363,6 +405,7 @@ tests/
   test_week4b_monte_carlo.py
   test_week5_estimation.py
   test_week6_actuators.py
+  test_week7_variable_mass.py
 docs/
   technical_physics_notes.md
   figure_results_interpretations.md
@@ -374,6 +417,7 @@ docs/
   week4b_monte_carlo.md
   week5_sensor_estimation.md
   week6_actuator_dynamics.md
+  week7_variable_mass.md
   animation_viewer.md
 outputs/
   generated CSV, SVG, HTML, and milestone reports
@@ -386,10 +430,10 @@ FIGURE_INDEX.md
 ## Limitations And Next Work
 
 - Aerodynamics use a simplified normal-force model rather than full coefficient tables.
-- Mass, inertia, and thrust are constant during the burn.
+- Mass, inertia, CM, and thrust are time-varying in Week 7, but the schedule is simplified rather than based on a detailed tank geometry or engine data set.
 - TVC actuator dynamics use a simplified first-order servo model rather than hardware-specific actuator data.
 - LQR is designed around the upright operating point and is not a global tumble-recovery controller.
-- Future extensions: gyro-bias estimation, translational Kalman filtering, mass depletion, gain scheduling, and higher-fidelity atmosphere/aerodynamics.
+- Future extensions: gyro-bias estimation, translational Kalman filtering, gain scheduling, and higher-fidelity atmosphere/aerodynamics.
 
 ## Interview Talking Points
 
@@ -401,3 +445,4 @@ FIGURE_INDEX.md
 - Why LQR is local and must be verified in the nonlinear plant.
 - Why Monte Carlo robustness is stronger evidence than one nominal trajectory.
 - Why finite TVC bandwidth affects phase margin and moment authority.
+- Why mass depletion and changing inertia motivate gain scheduling.

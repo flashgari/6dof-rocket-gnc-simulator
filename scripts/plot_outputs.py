@@ -111,6 +111,22 @@ def make_actuator_limited_comparison(instant_path, actuator_path, estimated_path
     legend=''.join(f'<line x1="{210+i*118}" y1="88" x2="{234+i*118}" y2="88" stroke="{color}" stroke-width="2.5"/><text x="{240+i*118}" y="92" class="legend">{name}</text>' for i,(name,color) in enumerate(legend_items))
     svg=f'<svg xmlns="http://www.w3.org/2000/svg" width="860" height="850" viewBox="0 0 860 850"><style>.bg{{fill:#f8fafc}}.title{{font:700 16px system-ui;fill:#111827}}.subtitle{{font:500 13px system-ui;fill:#475569}}.panel-title{{font:700 15px system-ui;fill:#111827}}.axis{{stroke:#334155;stroke-width:1.2}}.axis-label{{font:600 12px system-ui;fill:#334155}}.legend{{font:600 11px system-ui;fill:#475569}}</style><rect class="bg" width="860" height="850"/><text x="34" y="42" class="title">Week 6 Actuator-Limited TVC</text><text x="34" y="64" class="subtitle">Finite gimbal bandwidth, command tracking error, and remaining TVC moment authority.</text>{legend}{body}</svg>'
     svg_path.write_text(svg); print(f'Wrote {svg_path}')
+def make_variable_mass_plot(constant_path, variable_path, svg_path):
+    constant=read(constant_path); variable=read(variable_path); cx=col(constant,'time_s'); vx=col(variable,'time_s')
+    cm_cm=[100.0*y for y in col(variable,'center_of_mass_z_m')]
+    panels=[
+        ('Altitude',[{'name':'constant mass','x':cx,'y':col(constant,'z_m'),'color':'#0891b2'},{'name':'variable mass','x':vx,'y':col(variable,'z_m'),'color':'#f97316'}],'z (m)'),
+        ('Mass Depletion',[{'name':'mass','x':vx,'y':col(variable,'mass_kg'),'color':'#334155'}],'mass (kg)'),
+        ('Thrust-To-Mass',[{'name':'T/m','x':vx,'y':col(variable,'thrust_to_mass_mps2'),'color':'#dc2626'}],'T/m (m/s^2)'),
+        ('Inertia And CM Shift',[{'name':'Ixx','x':vx,'y':col(variable,'inertia_x_kg_m2'),'color':'#2563eb'},{'name':'CM z cm','x':vx,'y':cm_cm,'color':'#059669'}],'Ixx or CM z (cm)'),
+        ('Tilt Response',[{'name':'constant mass','x':cx,'y':col(constant,'tilt_deg'),'color':'#0891b2'},{'name':'variable mass','x':vx,'y':col(variable,'tilt_deg'),'color':'#f97316'}],'tilt (deg)'),
+        ('TVC Authority Margin',[{'name':'margin','x':vx,'y':col(variable,'torque_authority_margin_nm'),'color':'#7c3aed'}],'margin (N m)'),
+    ]
+    body=''.join(panel_multi(n,s,lab,126+i*128) for i,(n,s,lab) in enumerate(panels))
+    legend_items=[('constant mass','#0891b2'),('variable mass','#f97316'),('mass / inertia','#334155'),('T/m','#dc2626'),('authority margin','#7c3aed')]
+    legend=''.join(f'<line x1="{220+i*116}" y1="88" x2="{244+i*116}" y2="88" stroke="{color}" stroke-width="2.5"/><text x="{250+i*116}" y="92" class="legend">{name}</text>' for i,(name,color) in enumerate(legend_items))
+    svg=f'<svg xmlns="http://www.w3.org/2000/svg" width="860" height="920" viewBox="0 0 860 920"><style>.bg{{fill:#f8fafc}}.title{{font:700 16px system-ui;fill:#111827}}.subtitle{{font:500 13px system-ui;fill:#475569}}.panel-title{{font:700 15px system-ui;fill:#111827}}.axis{{stroke:#334155;stroke-width:1.2}}.axis-label{{font:600 12px system-ui;fill:#334155}}.legend{{font:600 11px system-ui;fill:#475569}}</style><rect class="bg" width="860" height="920"/><text x="34" y="42" class="title">Week 7 Variable-Mass Powered Ascent</text><text x="34" y="64" class="subtitle">Thrust curve, propellant depletion, moving mass properties, and TVC authority variation.</text>{legend}{body}</svg>'
+    svg_path.write_text(svg); print(f'Wrote {svg_path}')
 def refresh_figures():
     FIG.mkdir(exist_ok=True)
     copies={
@@ -121,6 +137,7 @@ def refresh_figures():
         'week5_estimated_tvc_plots.svg':'week5-estimated-state-tvc.svg',
         'week5_estimated_vs_truth_control_plots.svg':'week5-truth-vs-estimated-control.svg',
         'week6_actuator_limited_tvc_plots.svg':'week6-actuator-limited-tvc.svg',
+        'week7_variable_mass_plots.svg':'week7-variable-mass-ascent.svg',
     }
     for src,dst in copies.items():
         source=OUT/src
@@ -138,5 +155,6 @@ def main():
     make_estimator_plot(OUT/'week5_estimated_tvc_controlled.csv',OUT/'week5_estimated_tvc_plots.svg')
     make_estimated_control_comparison(OUT/'week4a_lqr_tvc_controlled.csv',OUT/'week5_estimated_tvc_controlled.csv',OUT/'week5_estimated_vs_truth_control_plots.svg')
     make_actuator_limited_comparison(OUT/'week4a_lqr_tvc_controlled.csv',OUT/'week6_lqr_tvc_actuator_limited.csv',OUT/'week6_estimated_lqr_tvc_actuator_limited.csv',OUT/'week6_actuator_limited_tvc_plots.svg')
+    make_variable_mass_plot(OUT/'week6_lqr_tvc_actuator_limited.csv',OUT/'week7_variable_mass_lqr_tvc.csv',OUT/'week7_variable_mass_plots.svg')
     refresh_figures()
 if __name__=='__main__': main()

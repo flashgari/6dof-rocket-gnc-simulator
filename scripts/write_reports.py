@@ -128,6 +128,28 @@ def actuator_metrics(path: Path) -> dict[str, float]:
     }
 
 
+def variable_mass_metrics(path: Path) -> dict[str, float]:
+    with path.open() as f:
+        rows = list(csv.DictReader(f))
+    return {
+        "initial_mass_kg": float(rows[0]["mass_kg"]),
+        "final_mass_kg": float(rows[-1]["mass_kg"]),
+        "initial_thrust_n": float(rows[0]["thrust_n"]),
+        "final_thrust_n": float(rows[-1]["thrust_n"]),
+        "max_thrust_n": max(float(row["thrust_n"]) for row in rows),
+        "initial_t_over_m_mps2": float(rows[0]["thrust_to_mass_mps2"]),
+        "final_t_over_m_mps2": float(rows[-1]["thrust_to_mass_mps2"]),
+        "max_t_over_m_mps2": max(float(row["thrust_to_mass_mps2"]) for row in rows),
+        "initial_inertia_x_kg_m2": float(rows[0]["inertia_x_kg_m2"]),
+        "final_inertia_x_kg_m2": float(rows[-1]["inertia_x_kg_m2"]),
+        "initial_cm_z_m": float(rows[0]["center_of_mass_z_m"]),
+        "final_cm_z_m": float(rows[-1]["center_of_mass_z_m"]),
+        "min_torque_authority_margin_nm": min(float(row["torque_authority_margin_nm"]) for row in rows),
+        "max_gimbal_lag_error_deg": max(float(row["gimbal_lag_error_deg"]) for row in rows),
+        "rate_limit_fraction": sum(int(row["rate_limited"]) for row in rows) / len(rows),
+    }
+
+
 def week2_reference() -> tuple[RocketParams, Environment]:
     misalign = math.radians(1.5)
     rocket = RocketParams(
@@ -536,6 +558,79 @@ Torque margin is the difference between available TVC moment and requested contr
 """
 
 
+WEEK7_PHYSICS = """
+## Upper-Division Variable-Mass Flight Physics
+
+Week 7 adds the coupling between propulsion, mass properties, and closed-loop control. The vehicle no longer flies with constant mass, constant inertia, or constant thrust. Propellant depletion is computed from engine impulse:
+
+```text
+m_dot = -T / (Isp g0)
+m(t) = m0 - integral(T / (Isp g0)) dt
+```
+
+The thrust curve changes translational acceleration through:
+
+```text
+a_thrust = T(t) / m(t)
+```
+
+This quantity does not necessarily increase monotonically. Mass decreases as propellant drains, but thrust can ramp up or tail off depending on the engine curve. In the Week 7 reference case, `T/m` starts at `15.80 m/s^2`, reaches a higher value during the high-thrust segment, and ends at `15.53 m/s^2` after thrust tails down to `760 N`.
+
+The rotational plant also changes:
+
+```text
+I(t) omega_dot + omega x (I(t) omega) = tau
+```
+
+As propellant mass decreases and the mass distribution moves toward the dry vehicle, transverse inertia decreases. For a fixed moment, lower inertia increases angular acceleration. That means the same controller gains can become more aggressive later in the burn. This is the physical motivation for gain scheduling in real ascent GNC: a controller tuned for wet mass may not have identical damping and bandwidth near dry mass.
+
+The center of mass also shifts:
+
+```text
+tau_aero = (r_CP - r_CM(t)) x F_N
+tau_TVC = r_engine x F_thrust
+```
+
+Moving CM changes both the aerodynamic moment arm and the effective geometry between engine force and vehicle mass center. In this simplified model, the CP stays fixed while CM moves upward as propellant drains, so the CP/CM lever arm changes during flight. This makes aerodynamic disturbance torque time-varying even for the same angle of attack and dynamic pressure.
+
+## Result Interpretation
+
+The variable-mass LQR TVC case reaches `33.32 m` final altitude, `11.21 deg` maximum tilt, and `11.12 m` maximum lateral drift. Mass decreases from `50.00 kg` to `48.93 kg`, transverse inertia decreases, and CM moves from `-0.080 m` to about `-0.056 m` in body coordinates.
+
+Compared with constant-mass actuator-limited LQR, the variable-mass case climbs higher because the thrust curve has a high-thrust middle segment and the vehicle becomes lighter during the burn. The attitude corridor remains controlled, but maximum tilt is slightly larger because changing inertia and CM modify the rotational response and disturbance moment arms while the controller gains remain fixed.
+
+The TVC authority margin remains positive. That matters because available TVC moment also varies with thrust:
+
+```text
+tau_max,TVC(t) ~= L T(t) sin(delta_max)
+```
+
+A thrust curve changes both acceleration and moment authority. Higher thrust increases `T/m` and increases available TVC torque; lower thrust near the end reduces both. Week 7 therefore makes the controller problem more coupled: propulsion performance, mass depletion, and actuator authority all move together.
+
+## Plot-Level Interpretation
+
+### Altitude
+
+The variable-mass trajectory climbs above the constant-mass actuator-limited baseline. This is not only because mass decreases; it is because the integrated thrust curve supplies a stronger middle-burn acceleration while drag and gravity losses remain comparable over the short window.
+
+### Mass And Thrust-To-Mass
+
+Mass decreases according to impulse over `Isp g0`. `T/m` follows both the changing numerator and denominator. The final `T/m` is lower than the initial value because thrust tails down enough to offset the reduced mass.
+
+### Inertia And CM Shift
+
+The decreasing `Ixx` indicates that the transverse rotational plant is changing. Lower inertia means a given TVC or aerodynamic moment produces larger angular acceleration. The CM shift changes `r_CP - r_CM`, so aerodynamic torque is not constant even if the aerodynamic force model were unchanged.
+
+### Tilt Response
+
+The controlled tilt remains inside the attitude corridor, which means the fixed LQR gains still tolerate the modeled mass-property variation. The slight increase relative to constant-mass LQR is physically expected because the plant poles and disturbance moment arms are moving during the burn.
+
+### TVC Authority Margin
+
+Authority margin stays positive, so the controller is not asking for unavailable moment. Since `tau_max,TVC` scales with thrust, the same thrust curve that changes vertical acceleration also changes the available attitude-control moment.
+"""
+
+
 def main() -> None:
     week1_metrics = summary_metrics(load_samples(OUT / "week1_ascent.csv"), RocketParams(mass_kg=50.0, thrust_n=850.0), Environment())
     week2_rocket, week2_env = week2_reference()
@@ -546,6 +641,7 @@ def main() -> None:
     week5_metrics = summary_metrics(load_samples(OUT / "week5_estimated_tvc_controlled.csv"), week2_rocket, week2_env)
     week6_metrics = summary_metrics(load_samples(OUT / "week6_lqr_tvc_actuator_limited.csv"), week2_rocket, week2_env)
     week6_estimated_metrics = summary_metrics(load_samples(OUT / "week6_estimated_lqr_tvc_actuator_limited.csv"), week2_rocket, week2_env)
+    week7_metrics = summary_metrics(load_samples(OUT / "week7_variable_mass_lqr_tvc.csv"), week2_rocket, week2_env)
 
     (OUT / "week1_milestone_report.md").write_text(
         "# Week 1 Milestone Report\n\n"
@@ -625,6 +721,30 @@ def main() -> None:
         + f"| Rate-limit fraction | {100.0 * est_act_metrics['rate_limit_fraction']:.1f}% |\n"
         + f"| Position-limit fraction | {100.0 * est_act_metrics['position_limit_fraction']:.1f}% |\n"
         + WEEK6_PHYSICS
+    )
+    var_metrics = variable_mass_metrics(OUT / "week7_variable_mass_lqr_tvc.csv")
+    (OUT / "week7_milestone_report.md").write_text(
+        "# Week 7 Milestone Report\n\n"
+        "## Objective\n\n"
+        "Add a thrust curve, propellant depletion from impulse and specific impulse, time-varying mass, shifting center of mass, changing inertia tensor, and TVC authority diagnostics under variable vehicle properties.\n\n"
+        "## Variable-Mass LQR TVC Case\n\n"
+        + metrics_table(week7_metrics)
+        + f"| Initial mass | {var_metrics['initial_mass_kg']:.2f} kg |\n"
+        + f"| Final mass | {var_metrics['final_mass_kg']:.2f} kg |\n"
+        + f"| Initial thrust | {var_metrics['initial_thrust_n']:.1f} N |\n"
+        + f"| Maximum thrust | {var_metrics['max_thrust_n']:.1f} N |\n"
+        + f"| Final thrust | {var_metrics['final_thrust_n']:.1f} N |\n"
+        + f"| Initial thrust-to-mass | {var_metrics['initial_t_over_m_mps2']:.2f} m/s^2 |\n"
+        + f"| Maximum thrust-to-mass | {var_metrics['max_t_over_m_mps2']:.2f} m/s^2 |\n"
+        + f"| Final thrust-to-mass | {var_metrics['final_t_over_m_mps2']:.2f} m/s^2 |\n"
+        + f"| Initial transverse inertia | {var_metrics['initial_inertia_x_kg_m2']:.2f} kg m^2 |\n"
+        + f"| Final transverse inertia | {var_metrics['final_inertia_x_kg_m2']:.2f} kg m^2 |\n"
+        + f"| Initial CM z | {var_metrics['initial_cm_z_m']:.3f} m |\n"
+        + f"| Final CM z | {var_metrics['final_cm_z_m']:.3f} m |\n"
+        + f"| Minimum torque authority margin | {var_metrics['min_torque_authority_margin_nm']:.2f} N m |\n"
+        + f"| Maximum gimbal lag error | {var_metrics['max_gimbal_lag_error_deg']:.2f} deg |\n"
+        + f"| Rate-limit fraction | {100.0 * var_metrics['rate_limit_fraction']:.1f}% |\n"
+        + WEEK7_PHYSICS
     )
 
     mc_rows = load_monte_carlo(OUT / "week4b_monte_carlo_results.csv")

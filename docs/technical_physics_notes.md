@@ -231,3 +231,40 @@ tau_margin = tau_max,TVC - |tau_requested|
 ```
 
 Positive torque margin means the controller remains inside the available moment envelope. This is the key aerospace-controls interpretation: Week 6 verifies not just that the LQR law stabilizes the math model, but that it remains feasible after the moment command is filtered through nozzle bandwidth, gimbal limits, and estimated-state feedback.
+
+## Week 7 Variable-Mass Flight Physics
+
+Week 7 makes the vehicle plant time-varying. Propellant depletion is computed from impulse and specific impulse:
+
+```text
+m_dot = -T / (Isp g0)
+m(t) = m0 - integral(T / (Isp g0)) dt
+```
+
+The translational acceleration scale is:
+
+```text
+a_thrust = T(t) / m(t)
+```
+
+This couples the thrust curve and mass depletion. Lower mass tends to increase acceleration, but thrust tailoff can reduce it. In the Week 7 run, `T/m` starts at `15.80 m/s^2`, peaks at `18.20 m/s^2`, and ends at `15.53 m/s^2`.
+
+The rotational plant also changes:
+
+```text
+I(t) omega_dot + omega x (I(t) omega) = tau
+```
+
+As transverse inertia decreases, the same moment creates larger angular acceleration. The CM shift also changes aerodynamic moment arm:
+
+```text
+tau_aero = (r_CP - r_CM(t)) x F_N
+```
+
+and thrust-dependent TVC authority changes according to:
+
+```text
+tau_max,TVC(t) ~= L T(t) sin(delta_max)
+```
+
+The closed-loop consequence is that a fixed-gain controller is operating on a moving plant. Week 7 remains stable, reaching `33.32 m` final altitude and `11.21 deg` maximum tilt, but the result motivates gain scheduling because mass, inertia, CM, dynamic pressure, and thrust level all affect control response and authority.

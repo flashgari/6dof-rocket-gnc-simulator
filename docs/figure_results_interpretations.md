@@ -360,3 +360,49 @@ tau_margin = L T sin(delta_max) - |tau_requested|
 ```
 
 A positive margin means the controller is requesting a moment inside the feasible TVC envelope. This is an important verification quantity because high gains can make a simulated controller look good only by asking for impossible moments. In Week 6 the margin remains positive and the rate-limit fraction is `0.0%`, so the controller is not relying on unavailable actuator authority in the nominal actuator-limited case.
+
+## Week 7 Variable-Mass Powered Ascent Plot
+
+Artifact:
+
+```text
+outputs/week7_variable_mass_plots.svg
+```
+
+### Altitude
+
+The variable-mass trajectory reaches `33.32 m`, above the constant-mass actuator-limited reference. The explanation is the integral of net vertical acceleration, not simply the fact that the rocket gets lighter. The thrust curve rises to `900 N` in the middle of the burn while mass is decreasing, so the vehicle experiences a stronger `T(t)/m(t)` segment before thrust tails down.
+
+### Mass And Thrust-To-Mass
+
+Mass decreases from `50.00 kg` to `48.93 kg` according to:
+
+```text
+m_dot = -T / (Isp g0)
+```
+
+The `T/m` trace starts at `15.80 m/s^2`, peaks at `18.20 m/s^2`, and ends at `15.53 m/s^2`. This panel is important because it shows that acceleration depends on both numerator and denominator. A falling thrust curve can overpower the acceleration benefit of lower mass near the end of burn.
+
+### Inertia And CM Shift
+
+The transverse inertia decreases from `3.15` to `3.07 kg m^2`, which changes the rotational plant:
+
+```text
+I(t) omega_dot + omega x (I(t) omega) = tau
+```
+
+The CM moves from `-0.080 m` to `-0.056 m`, changing the CP/CM aerodynamic moment arm. The plot displays this CM coordinate in centimeters so the shift is visible beside the inertia trend. This means the same angle of attack and dynamic pressure can produce a different rotational disturbance later in the burn.
+
+### Tilt Response
+
+The variable-mass case stays controlled with `11.21 deg` maximum tilt. The small difference relative to the constant-mass actuator-limited case is the expected closed-loop signature of changing inertia, CM, and thrust authority with fixed LQR gains. This is exactly why real ascent controllers are often scheduled over mass state, dynamic pressure, and thrust level.
+
+### TVC Authority Margin
+
+TVC authority margin remains positive, with minimum margin `50.27 N m`. Since:
+
+```text
+tau_max,TVC(t) ~= L T(t) sin(delta_max)
+```
+
+the thrust curve changes both acceleration and available control moment. Week 7 verifies that the controller remains inside the finite actuator authority envelope even while propulsion and mass properties vary.

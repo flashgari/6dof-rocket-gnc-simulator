@@ -11,6 +11,9 @@ from .actuators import GimbalActuatorConfig
 from .sensors import AttitudeEstimator
 from .sensors import AttitudeEstimatorConfig
 from .sensors import SensorModel
+from .propulsion import MassPropertySchedule
+from .propulsion import ThrustCurve
+from .propulsion import TimeVaryingRocket
 
 __all__ = [
     "Environment",
@@ -20,7 +23,10 @@ __all__ = [
     "GimbalActuatorConfig",
     "IdealTorqueController",
     "LQRAttitudeController",
+    "MassPropertySchedule",
     "SensorModel",
+    "ThrustCurve",
+    "TimeVaryingRocket",
     "TVCController",
     "RocketParams",
     "State",

@@ -207,6 +207,43 @@ tau_max,TVC ~= L T sin(delta_max)
 
 so the stabilized response is not being purchased by impossible moment commands. This result makes the project more flight-relevant because it ties the control law to actuator bandwidth and achievable torque, not just ideal feedback math.
 
+## Variable-Mass Powered Ascent
+
+Week 7 adds a time-varying propulsion and mass-property model. Propellant usage is computed from thrust impulse and specific impulse:
+
+```text
+m_dot = -T / (Isp g0)
+m(t) = m0 - integral(T / (Isp g0)) dt
+```
+
+The vehicle now has a thrust curve, decreasing mass, shifting center of mass, and changing inertia tensor. This matters because ascent is not a fixed-plant controls problem. Translational acceleration changes through:
+
+```text
+a_thrust = T(t) / m(t)
+```
+
+while the rotational plant changes through:
+
+```text
+I(t) omega_dot + omega x (I(t) omega) = tau
+```
+
+and aerodynamic moment arms change through:
+
+```text
+tau_aero = (r_CP - r_CM(t)) x F_N
+```
+
+TVC authority also varies with thrust:
+
+```text
+tau_max,TVC(t) ~= L T(t) sin(delta_max)
+```
+
+The variable-mass actuator-limited LQR case reaches final altitude `33.32 m`, limits maximum tilt to `11.21 deg`, and limits lateral drift to `11.12 m`. Mass decreases from `50.00 kg` to `48.93 kg`, `T/m` peaks at `18.20 m/s^2`, transverse inertia decreases from `3.15` to `3.07 kg m^2`, and CM moves from `-0.080 m` to `-0.056 m`.
+
+The physical takeaway is that the controller remains stable even though the plant is moving under it. The result also motivates gain scheduling: as propellant drains, the same gains do not act on the same inertia, CM location, thrust level, aerodynamic moment arm, or TVC authority.
+
 ## What The Plots Prove
 
 The Week 2 plots prove the failure mechanism: disturbance moments rotate the thrust axis, and the trajectory fails because thrust projection changes.
@@ -223,11 +260,14 @@ The Week 5 plots prove that the controller remains effective when driven by esti
 
 The Week 6 plots prove that the controller remains effective when the TVC actuator has finite bandwidth and the plant receives achieved gimbal angle rather than requested gimbal angle.
 
+The Week 7 plots prove that the controller remains effective when mass, thrust, inertia, center of mass, and TVC authority vary during the burn.
+
 ## Limitations
 
 - Aerodynamics use a simplified normal-force model, not full coefficient tables.
 - Mass, inertia, and thrust are constant during the simulated burn.
 - TVC actuator dynamics use a simplified first-order servo model rather than hardware-specific actuator data.
+- Week 7 mass properties use a simplified interpolation schedule rather than detailed propellant slosh, tank geometry, or engine data.
 - LQR is local to upright ascent and is not a global recovery controller.
 - Monte Carlo dispersions are representative for this project, not mission-certified requirements.
 
@@ -235,9 +275,8 @@ The Week 6 plots prove that the controller remains effective when the TVC actuat
 
 - Add gyro-bias estimation and estimator latency.
 - Add translational GPS/barometer measurements and Kalman filtering.
-- Add mass depletion and time-varying inertia.
-- Add atmosphere variation with altitude.
 - Add gain scheduling across dynamic pressure and mass states.
+- Add atmosphere variation with altitude.
 - Replace the simplified aero model with coefficient tables or CFD-derived lookup data.
 
 ## Interview Talking Points
@@ -251,3 +290,4 @@ The Week 6 plots prove that the controller remains effective when the TVC actuat
 - Monte Carlo analysis demonstrates robustness over uncertainty, not just nominal performance.
 - Estimated-state feedback connects controls to avionics by showing how sensor bias/noise and attitude estimation affect TVC commands.
 - Actuator dynamics connect controls to hardware feasibility by showing how gimbal bandwidth, phase lag, and torque-authority margin affect the same TVC loop.
+- Variable mass connects propulsion to GNC by showing why `T/m`, `I(t)`, CM shift, and thrust-dependent TVC authority motivate scheduled control.
