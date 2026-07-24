@@ -1,24 +1,30 @@
-# 6-DOF Rocket Flight Simulator with TVC, LQR, and Monte Carlo Verification
+# Nonlinear 6-DOF Launch-Vehicle Ascent GNC
 
 ## Project Objective
 
-This project is a Python-based launch-vehicle GNC simulation and verification workflow. The goal is to model nonlinear rigid-body ascent dynamics, introduce realistic disturbance mechanisms, demonstrate open-loop failure, stabilize the vehicle with attitude feedback, implement actuator-realistic thrust vector control, compare PD and LQR control, evaluate robustness with a Monte Carlo dispersion campaign, and close the loop through a sensor-based attitude estimator.
+This project is a Python-based launch-vehicle GNC simulation and verification workflow. The objective is to trace one engineering argument from first principles to evidence: disturbance moments cause thrust-axis departure; attitude departure redirects engine impulse and degrades the trajectory; feedback arrests the rotational mode; and the resulting command remains feasible after TVC geometry, state estimation, finite actuator bandwidth, and changing mass properties are introduced.
 
 The project is structured around the same logic used in flight-dynamics and controls verification:
 
 ```text
-derive dynamics -> build nominal simulation -> add disturbances -> observe failure -> design controller -> model actuator -> verify robustness -> add sensors and estimated-state feedback
+derive dynamics -> establish limiting cases -> expose failure mechanism
+-> design feedback -> allocate through TVC -> add estimation and actuator dynamics
+-> disperse the plant -> evaluate requirements and margin
 ```
 
-Completed scope:
+Primary evidence:
 
 | Evidence | Result |
 | --- | --- |
 | Automated verification | `37` tests passing |
 | Robustness campaign | `300` Monte Carlo cases |
-| Milestone reports | `7` generated reports with plot-level physical interpretation |
-| Visual artifacts | SVG figures and synchronized HTML animation |
-| Highest-fidelity case | Estimated/actuator-limited, variable-mass LQR TVC ascent |
+| Open-loop failure | `177.63 deg` maximum tilt and loss of thrust-axis alignment |
+| Nonlinear LQR TVC | `10.30 deg` maximum tilt with zero nominal saturation |
+| Estimated-state feedback | `0.32 deg` maximum attitude-estimation error |
+| Finite-bandwidth TVC | `48.58 N m` minimum modeled torque-authority margin |
+| Variable-mass case | Stable with evolving `T/m`, inertia, CM, and TVC authority |
+
+The recommended review order is the [engineering evidence guide](FIGURE_INDEX.md), the [requirement traceability matrix](VERIFICATION_MATRIX.md), and then this report.
 
 ## System Model
 
@@ -256,21 +262,15 @@ The physical takeaway is that the controller remains stable even though the plan
 
 ## What The Plots Prove
 
-The Week 2 plots prove the failure mechanism: disturbance moments rotate the thrust axis, and the trajectory fails because thrust projection changes.
+The [control-system evidence](figures/control-system-evidence.svg) establishes the causal chain from rotational departure to translational failure. It also separates the ideal feedback-law question from the TVC force-allocation question.
 
-The Week 3A plots prove the feedback law can stabilize the nonlinear attitude dynamics with bounded ideal torque.
+The [Monte Carlo envelope](figures/monte-carlo-control-envelope.svg) demonstrates robustness over a declared finite uncertainty set. It reports every controlled trial and explicit distance to the gates, so the claim is based on sampled margin rather than a `100%` bar alone.
 
-The Week 3B plots prove the same stabilization objective remains feasible with a finite TVC actuator, while exposing the attitude-translation coupling introduced by gimbaled thrust.
+The [estimated-state evidence](figures/estimated-state-control-evidence.svg) shows that sub-degree quaternion-estimation error remains small relative to the controlled excursion and does not consume the gimbal envelope.
 
-The Week 4A plots prove that a local LQR design can be inserted into the nonlinear plant and improve attitude/lateral-drift performance relative to PD TVC without saturating the actuator.
+The [actuator-bandwidth evidence](figures/actuator-bandwidth-evidence.svg) shows that the nonlinear plant receives achieved rather than commanded gimbal and remains stable with positive moment-authority margin. This is a time-domain feasibility result; it does not replace frequency-domain robustness analysis.
 
-The Week 4B plot proves robustness statistically over a defined dispersion set, which is stronger evidence than a single nominal run.
-
-The Week 5 plots prove that the controller remains effective when driven by estimated attitude and angular rate rather than perfect truth-state feedback.
-
-The Week 6 plots prove that the controller remains effective when the TVC actuator has finite bandwidth and the plant receives achieved gimbal angle rather than requested gimbal angle.
-
-The Week 7 plots prove that the controller remains effective when mass, thrust, inertia, center of mass, and TVC authority vary during the burn.
+The [variable-mass evidence](figures/variable-mass-evidence.svg) shows that propulsion, translation, rotation, aerodynamic leverage, and TVC effectiveness evolve simultaneously. Stability of the short fixed-gain case motivates, but does not replace, trajectory-linearized gain scheduling.
 
 ## Limitations
 
@@ -282,11 +282,11 @@ The Week 7 plots prove that the controller remains effective when mass, thrust, 
 
 ## Next Improvements
 
-- Add gyro-bias estimation and estimator latency.
-- Add translational GPS/barometer measurements and Kalman filtering.
-- Add gain scheduling across dynamic pressure and mass states.
-- Add atmosphere variation with altitude.
-- Replace the simplified aero model with coefficient tables or CFD-derived lookup data.
+- Linearize the nonlinear plant along a reference trajectory and schedule gains against mass state, thrust, and dynamic pressure.
+- Identify actuator bandwidth and uncertainty, then report loop crossover and gain/phase or disk margins.
+- Add translational GPS/barometer measurements, IMU alignment states, timing latency, and an error-state navigation filter with covariance consistency checks.
+- Replace constant-density and linear normal-force assumptions with atmosphere and aerodynamic coefficient tables indexed by Mach and angle of attack.
+- Add slosh and first-bending-mode dynamics to evaluate control/structure interaction and notch-filter requirements.
 
 ## Interview Talking Points
 

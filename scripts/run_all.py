@@ -14,6 +14,7 @@ def main():
     run([sys.executable,'scripts/run_week6_actuator_limited_tvc.py'])
     run([sys.executable,'scripts/run_week7_variable_mass_ascent.py'])
     run([sys.executable,'scripts/plot_outputs.py'])
+    run([sys.executable,'scripts/plot_recruiter_evidence.py'])
     run([sys.executable,'scripts/write_reports.py'])
     run([sys.executable,'scripts/build_animation.py'])
     run([sys.executable,'-m','unittest','discover','-s','tests'])

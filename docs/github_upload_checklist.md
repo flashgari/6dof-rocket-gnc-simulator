@@ -14,21 +14,17 @@ Use this before publishing the repository.
 - [x] `outputs/`
 - [x] `figures/`
 - [x] `FIGURE_INDEX.md`
+- [x] `VERIFICATION_MATRIX.md`
 
 ## Must-Show Artifacts
 
-- [x] `outputs/week3b_control_comparison_plots.svg`
-- [x] `outputs/week4a_lqr_control_comparison_plots.svg`
-- [x] `outputs/week4b_monte_carlo_summary.svg`
-- [x] `outputs/week6_actuator_limited_tvc_plots.svg`
-- [x] `outputs/week7_variable_mass_plots.svg`
 - [x] `outputs/rocket_flight_animation.html`
-- [x] `figures/week2-open-loop-failure.svg`
-- [x] `figures/week3b-control-comparison.svg`
-- [x] `figures/week4a-lqr-control-comparison.svg`
-- [x] `figures/week4b-monte-carlo-robustness.svg`
-- [x] `figures/week6-actuator-limited-tvc.svg`
-- [x] `figures/week7-variable-mass-ascent.svg`
+- [x] `figures/rocket-animation-preview.svg`
+- [x] `figures/control-system-evidence.svg`
+- [x] `figures/monte-carlo-control-envelope.svg`
+- [x] `figures/estimated-state-control-evidence.svg`
+- [x] `figures/actuator-bandwidth-evidence.svg`
+- [x] `figures/variable-mass-evidence.svg`
 - [x] `docs/figure_results_interpretations.md`
 
 ## Verification Command
@@ -51,15 +47,15 @@ OK
 For a recruiter or engineer reviewing quickly:
 
 1. Read `README.md`.
-2. Read `FIGURE_INDEX.md`.
-3. Open `figures/week4b-monte-carlo-robustness.svg`.
-4. Open `figures/week4a-lqr-control-comparison.svg`.
-5. Open `figures/week6-actuator-limited-tvc.svg`.
-6. Open `figures/week7-variable-mass-ascent.svg`.
-7. Open the rendered animation preview:
+2. Open the rendered animation preview:
    `https://htmlpreview.github.io/?https://github.com/flashgari/6dof-rocket-gnc-simulator/blob/main/outputs/rocket_flight_animation.html`
-8. Read `PORTFOLIO_WRITEUP.md`.
-9. Read `docs/figure_results_interpretations.md` for plot-by-plot physics.
+3. Read `FIGURE_INDEX.md`.
+4. Open `figures/control-system-evidence.svg`.
+5. Open `figures/monte-carlo-control-envelope.svg`.
+6. Open `figures/estimated-state-control-evidence.svg`.
+7. Open `figures/actuator-bandwidth-evidence.svg`.
+8. Open `figures/variable-mass-evidence.svg`.
+9. Read `VERIFICATION_MATRIX.md` and `PORTFOLIO_WRITEUP.md`.
 
 ## Interview Prep
 

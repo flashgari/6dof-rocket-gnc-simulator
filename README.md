@@ -1,475 +1,218 @@
-# 6-DOF Rocket Flight Simulator with TVC, LQR, and Monte Carlo Verification
+# Nonlinear 6-DOF Launch-Vehicle Ascent GNC
 
 [![tests](https://github.com/flashgari/6dof-rocket-gnc-simulator/actions/workflows/test.yml/badge.svg)](https://github.com/flashgari/6dof-rocket-gnc-simulator/actions/workflows/test.yml)
 
-This repository is a controls/GNC portfolio project for launch-vehicle ascent dynamics. It implements a nonlinear 6-DOF rigid-body rocket simulation, introduces aerodynamic and propulsion disturbances, demonstrates open-loop instability, stabilizes the vehicle with attitude feedback, allocates control through thrust vector control, compares PD and LQR control laws, adds sensor-based attitude estimation, checks finite-bandwidth TVC actuator dynamics, and verifies robustness with a Monte Carlo dispersion campaign.
+A first-principles Python simulation of disturbed launch-vehicle ascent, quaternion attitude estimation, PD and LQR feedback, thrust-vector-control allocation, finite-bandwidth gimbal dynamics, variable mass properties, and fixed-seed Monte Carlo verification.
 
-The project is intentionally written as an engineering artifact: the code, plots, animation, tests, and writeups are organized so a reviewer can trace the work from first-principles dynamics to closed-loop verification.
+**[Launch the synchronized flight animation](https://htmlpreview.github.io/?https://github.com/flashgari/6dof-rocket-gnc-simulator/blob/main/outputs/rocket_flight_animation.html)** | [Read the engineering report](PORTFOLIO_WRITEUP.md) | [Review every figure](FIGURE_INDEX.md)
 
-## Project Status
+![Synchronized open-loop, ideal-torque, PD TVC, and LQR TVC animation preview](figures/rocket-animation-preview.svg)
 
-| Evidence | Status |
-| --- | --- |
-| Automated verification | `37` unit/integration tests passing |
-| Robustness campaign | `300` Monte Carlo cases across open loop, PD TVC, and LQR TVC |
-| Milestone documentation | `7` generated milestone reports |
-| Visual artifacts | Recruiter-facing SVG figures plus synchronized HTML animation |
-| GNC scope | Nonlinear dynamics, disturbances, PD/LQR control, TVC allocation, estimation, actuator limits, and variable mass |
+The animation is generated from the same committed CSV histories used by the verification figures. Four vehicles are shown because they are matched simulations of one disturbed plant under four control architectures: red is open loop, blue is ideal body torque, green is PD TVC, and cyan is LQR TVC.
 
-![Monte Carlo robustness summary](figures/week4b-monte-carlo-robustness.svg)
+## Engineering Result
 
-The headline result: the disturbed open-loop vehicle tumbles, while actuator-realistic TVC feedback keeps the rocket inside the attitude corridor across nominal runs and the sampled uncertainty envelope.
+The central result is not simply that a controller reduces an angle. Without feedback, disturbance moments rotate the thrust axis through horizontal and nearly inverted orientations. The engine then redirects impulse away from inertial vertical, coupling attitude divergence into altitude loss and crossrange motion. Feedback arrests that rotational mode, while the TVC cases verify that the required moment can be produced through a gimbaled thrust vector rather than an unconstrained ideal torque source.
 
-## Engineering Summary
+![Open-loop failure and controlled-ascent evidence](figures/control-system-evidence.svg)
 
-| Area | Implementation |
-| --- | --- |
-| Dynamics | 13-state nonlinear rigid-body model: inertial position, velocity, quaternion attitude, and body angular velocity |
-| Integration | Fixed-step RK4 with quaternion normalization and sanity tests |
-| Disturbances | Crosswind, thrust misalignment, thrust offset, drag, angle-of-attack normal force, and CP/CM moment arm |
-| Control | Ideal body-torque PD, actuator-realistic PD TVC, LQR TVC, estimated-state LQR TVC, and actuator-limited LQR TVC |
-| Actuation | TVC allocation, gimbal envelope, first-order servo lag, slew-rate limits, commanded-vs-achieved gimbal tracking, and torque-authority margin |
-| Propulsion | Thrust curve, impulse-based propellant depletion, time-varying mass, shifting CM, and changing inertia |
-| Avionics | Noisy IMU model, low-rate attitude reference, quaternion attitude estimator, and sensor-driven feedback |
-| Verification | Nominal controlled/uncontrolled comparisons, estimated-state control comparison, and 300-case Monte Carlo campaign |
-| Presentation | SVG plots, CSV outputs, milestone reports, synchronized HTML animation, and upper-division physics explanations |
+For the matched `3.0 s` low-altitude demonstration:
 
-## Results At A Glance
-
-Nominal disturbed ascent over a `3 s` simulation window:
-
-| Case | Final altitude | Max tilt | Max lateral drift | Gimbal saturation |
+| Architecture | Maximum tilt | Final altitude | Maximum lateral drift | Gimbal saturation |
 | --- | ---: | ---: | ---: | ---: |
-| Open loop | 3.99 m | 177.63 deg | 25.10 m | n/a |
-| Ideal torque PD | 31.96 m | 9.88 deg | 5.65 m | n/a |
-| PD TVC | 30.97 m | 12.94 deg | 13.24 m | 0.0% |
-| LQR TVC | 31.43 m | 10.30 deg | 10.73 m | 0.0% |
-| Estimated-state LQR TVC | 31.42 m | 10.43 deg | 10.83 m | 0.0% |
-| Actuator-limited LQR TVC | 31.42 m | 11.09 deg | 10.67 m | 0.0% |
-| Estimated actuator-limited LQR TVC | 31.43 m | 10.91 deg | 10.58 m | 0.0% |
-| Variable-mass actuator-limited LQR TVC | 33.32 m | 11.21 deg | 11.12 m | 0.0% |
+| Open loop | 177.63 deg | 3.99 m | 25.10 m | n/a |
+| Ideal body-torque PD | 9.88 deg | 31.96 m | 5.65 m | n/a |
+| PD TVC | 12.94 deg | 30.97 m | 13.24 m | 0.0% |
+| LQR TVC | 10.30 deg | 31.43 m | 10.73 m | 0.0% |
 
-Monte Carlo robustness campaign with `100` randomized dispersions per controller:
+Ideal torque isolates the feedback law from actuator geometry. Its smaller drift is expected because it can apply a pure moment without canting the net force. TVC is the more physical control architecture: the engine develops moment through `r_engine x F_thrust`, so attitude correction necessarily consumes some lateral-force authority. LQR improves nominal tilt and drift relative to PD within the same nonlinear plant and gimbal model.
 
-| Controller | Success rate | Median max tilt | Median max lateral drift | Worst max tilt | Worst lateral drift |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| Open loop | 1.0% | 177.04 deg | 24.29 m | 179.82 deg | 27.74 m |
-| PD TVC | 100.0% | 12.05 deg | 12.69 m | 22.88 deg | 23.56 m |
-| LQR TVC | 100.0% | 9.67 deg | 10.35 m | 17.92 deg | 19.10 m |
+## GNC Architecture
 
-## Visual Evidence
-
-The figures are meant to show a full GNC argument, not only attractive plots. The open-loop case establishes the failure mechanism: small thrust-vector and aerodynamic disturbances create body moments, the angular rate grows, the thrust axis rotates away from inertial vertical, and the vehicle begins spending engine impulse on lateral and eventually downward acceleration. The controlled cases then show what changes when feedback torque is introduced and when that torque is constrained by a real TVC geometry.
-
-## Interactive Flight Animation
-
-The project includes a standalone HTML animation generated from the simulator CSV outputs:
-
-[View the interactive animation in a browser](https://htmlpreview.github.io/?https://github.com/flashgari/6dof-rocket-gnc-simulator/blob/main/outputs/rocket_flight_animation.html)
-
-GitHub displays HTML files as source code by default. The browser-preview link above renders the animation; the repo source artifact is [outputs/rocket_flight_animation.html](outputs/rocket_flight_animation.html).
-
-The animation compares open-loop failure, ideal body-torque control, PD TVC, and LQR TVC on a synchronized timeline. It shows the rocket attitude, trajectory, body-axis vertical alignment, lateral drift, and gimbal usage in one viewer. This matters because the failure is fundamentally coupled: attitude error is not just an angular quantity, it changes the direction of the thrust force in the translational equations.
-
-![Rocket flight animation preview](figures/rocket-animation-preview.svg)
-
-In the open-loop lane, the vehicle may visually pass through an upright-looking attitude after tumbling, but that is not recovery. The unwrapped pitch history and `body_z_z` metric show that the thrust axis has already passed through horizontal and inverted orientations. During that interval, vertical thrust authority collapses and lateral kinetic energy accumulates. The controlled lanes demonstrate the opposite behavior: feedback keeps `body_z_z` close to one, so most of the thrust remains available for ascent rather than crossrange motion.
-
-## Monte Carlo Robustness
-
-The Monte Carlo figure summarizes `100` randomized dispersions for each controller. The sampled uncertainties include wind, thrust alignment, mass, inertia, CP location, normal-force slope, and gimbal authority. This is more meaningful than a single nominal run because launch vehicle ascent is sensitive to coupled dispersions: a slightly different inertia changes angular acceleration, a different CP location changes aerodynamic moment arm, and a different wind changes angle of attack and dynamic pressure loading.
-
-The open-loop success rate is `1.0%`, with median maximum tilt near `177 deg`, which means the representative uncontrolled case essentially tumbles into inverted flight. PD TVC and LQR TVC both reach `100.0%` success under the selected pass/fail gates, showing that feedback control is not merely tuned for one convenient trajectory. LQR TVC also reduces median maximum tilt from `12.0 deg` to `9.7 deg` and median lateral drift from `12.7 m` to `10.3 m` relative to PD TVC, indicating better transverse-mode regulation inside the same actuator envelope.
-
-## Controller Comparison
-
-The comparison plot separates three different engineering questions. Open loop answers, "What does the disturbed plant do without feedback?" Ideal body torque answers, "Can the attitude-control law stabilize the nonlinear rigid body if torque is available?" TVC answers, "Can the same stabilization objective be achieved when moment must come from tilting a thrust vector through a finite lever arm?"
-
-![LQR control comparison](figures/week4a-lqr-control-comparison.svg)
-
-The ideal-torque case reaches the cleanest trajectory because it applies moment without changing the net thrust direction. TVC is more physically realistic: it creates moment through `r_engine x F_thrust`, which necessarily introduces lateral force components. That is why TVC can have more lateral drift than ideal torque even when attitude is stabilized. LQR TVC improves over PD TVC in the nominal case because its feedback gains are selected from a state/control cost trade instead of independent proportional and derivative tuning, but the result is still checked in the nonlinear 6-DOF plant rather than only in the linear design model.
-
-## Sensor-Based Attitude Estimation
-
-The Week 5 result adds an avionics layer between the truth-state simulation and the TVC controller. The simulated IMU provides biased/noisy gyro and accelerometer measurements, while a quaternion estimator propagates attitude using gyro integration and corrects drift with a low-rate noisy attitude reference. This is a more realistic GNC architecture because the controller no longer receives perfect attitude and angular-rate truth.
-
-![Estimated-state TVC plots](figures/week5-estimated-state-tvc.svg)
-
-The accelerometer is modeled as body-frame specific force, `f_B = R_IB(q)(a_I - g_I)`, not as a clean gravity direction. That distinction matters in powered ascent: the accelerometer is dominated by thrust and aerodynamic loading, so using it as a simple gravity-leveling sensor would be physically wrong. The estimator therefore uses gyro propagation for high-bandwidth attitude tracking and reference corrections to bound drift.
-
-![Truth-state vs estimated-state control](figures/week5-truth-vs-estimated-control.svg)
-
-The estimated-state controller remains close to the truth-state LQR baseline: maximum attitude estimation error is `0.32 deg`, RMS attitude estimation error is `0.17 deg`, and gimbal saturation remains `0.0%`. The control implication is that sensor noise and bias are small enough, after estimation, that the TVC loop remains inside the modeled attitude corridor and actuator envelope.
-
-## Actuator-Limited TVC
-
-Week 6 adds finite TVC actuator dynamics. The controller can request a nozzle angle, but the plant only receives the achieved angle after first-order servo lag, slew-rate limiting, and the hard gimbal envelope:
-
-```text
-delta_dot_cmd = (delta_cmd - delta_act) / tau_servo
-|delta_dot_act| <= delta_dot_max
-|delta_act| <= delta_max
-tau_TVC = r_engine x F(delta_act)
+```mermaid
+flowchart LR
+    D["Wind, thrust misalignment,<br/>CP/CM moment, mass dispersion"] --> P["Nonlinear 13-state<br/>6-DOF plant"]
+    P --> S["Gyro, accelerometer,<br/>low-rate attitude reference"]
+    S --> E["Quaternion attitude<br/>estimator"]
+    E --> C["PD or LQR<br/>attitude feedback"]
+    C --> A["TVC allocation,<br/>lag, rate and position limits"]
+    A --> P
+    P --> V["Requirements, Monte Carlo,<br/>CSV and visual evidence"]
 ```
 
-![Actuator-limited TVC plots](figures/week6-actuator-limited-tvc.svg)
+The simulated state is
 
-This is a controls-stability check, not just a mechanical add-on. Finite actuator bandwidth inserts phase lag between attitude error and corrective moment. If the nozzle moves too slowly, the controller applies torque to an older attitude/rate state, reducing damping and phase margin. In the nominal Week 6 case, actuator-limited LQR remains stable: maximum tilt is `11.09 deg` for truth-state feedback and `10.91 deg` for estimated-state feedback. The peak gimbal lag is about `1.50 deg`, rate limiting remains `0.0%`, and torque-authority margin remains positive. That means the controller is not relying on instant or impossible nozzle motion to preserve thrust-axis alignment.
+`x = [r_I, v_I, q_BI, omega_B]`, with `3 + 3 + 4 + 3 = 13` states.
 
-## Variable-Mass Powered Ascent
+The software separates dynamics, integration, control, actuation, estimation, propulsion, simulation orchestration, and analysis into testable modules under [`rocket_sim/`](rocket_sim/). The complete project regenerates from standard-library Python without third-party runtime dependencies.
 
-Week 7 adds a propulsion/mass-property schedule: thrust varies with time, propellant depletion is computed from impulse and specific impulse, the center of mass shifts, and inertia changes during the burn.
+## Flight Mechanics
 
-```text
-m_dot = -T / (Isp g0)
-a_thrust = T(t) / m(t)
-I(t) omega_dot + omega x (I(t) omega) = tau
-tau_max,TVC(t) ~= L T(t) sin(delta_max)
-```
+### Coupled Translation and Rotation
 
-![Variable-mass ascent plots](figures/week7-variable-mass-ascent.svg)
+The inertial translation model is
 
-The variable-mass case reaches `33.32 m` final altitude, `11.21 deg` maximum tilt, and `11.12 m` maximum lateral drift. Mass decreases from `50.00 kg` to `48.93 kg`, transverse inertia decreases from `3.15` to `3.07 kg m^2`, and CM moves from `-0.080 m` to `-0.056 m`. The result is physically important because changing mass properties alter both sides of the control problem: translational acceleration changes through `T/m`, rotational response changes through `I(t)`, aerodynamic moment arms change through `r_CP - r_CM(t)`, and TVC authority changes through thrust. The fixed LQR gains still hold the vehicle inside the attitude corridor, which motivates gain scheduling as the next serious controls extension.
+`m r_ddot_I = R_BI(q) F_B + m g_I`.
 
-## Review Path
+Thrust and aerodynamic forces are assembled in body coordinates and rotated into the inertial frame with the propagated quaternion. This rotation is the mechanism that converts attitude error into trajectory error. If `e_z,B . e_z,I = cos(theta)` falls toward zero, the thrust axis is horizontal and contributes essentially no vertical support. If it becomes negative, thrust opposes ascent.
 
-| Start here | Purpose |
+Rotational motion follows Euler's rigid-body equation,
+
+`I omega_dot_B + omega_B x (I omega_B) = tau_B`.
+
+The cross product is retained, so the response includes gyroscopic cross-axis coupling rather than three independent scalar double integrators. Quaternions avoid the singularity and branch ambiguity that Euler angles would introduce during the intentional open-loop tumble. RK4 advances the state, and quaternion normalization controls numerical constraint drift.
+
+### Aerodynamic and Propulsive Disturbance Moments
+
+Relative wind, rather than inertial velocity alone, determines the aerodynamic state:
+
+`v_rel,I = v_I - v_wind,I`
+
+`q_bar = 0.5 rho ||v_rel||^2`
+
+`F_N approximately q_bar S C_N_alpha alpha`.
+
+The normal force acts at the center of pressure, producing
+
+`tau_aero = (r_CP - r_CM) x F_N`.
+
+Because `q_bar` grows quadratically with relative speed, the same angular perturbation can produce a much larger moment later in the ascent. Thrust-axis misalignment and force application away from the center of mass add propulsive moments. The open-loop trace is therefore an angular instability with a translational consequence, not an arbitrary scripted trajectory.
+
+### Feedback and TVC Authority
+
+PD feedback supplies rotational stiffness and damping,
+
+`tau_cmd = K_p e_q - K_d omega`,
+
+where the vector part of the shortest-path quaternion error defines the attitude correction. The LQR design uses a local pitch/yaw model near upright flight,
+
+`theta_dot = omega`, `omega_dot = tau / I`,
+
+and computes a state-feedback trade between angular error, rate, and control effort. It is not claimed as a global tumble-recovery law. Its validity is evaluated by closing it around the nonlinear quaternion plant and keeping the nominal response inside the local operating region.
+
+TVC maps requested pitch/yaw moment into engine deflection:
+
+`tau_TVC = r_engine x F_thrust(delta)`
+
+`tau_max,TVC approximately L T sin(delta_max)`.
+
+Controller gain alone cannot create moment beyond this envelope. The simulation therefore records commanded and achieved gimbal, position and slew limiting, and the difference between available and requested moment.
+
+## Verification Evidence
+
+### Robustness Is Reported as Margin, Not Only Pass Rate
+
+![Monte Carlo robustness envelope](figures/monte-carlo-control-envelope.svg)
+
+The fixed-seed campaign applies the same `100` randomized dispersions to each architecture. Pass criteria are evaluated simultaneously:
+
+- maximum tilt below `25 deg`
+- final altitude above `20 m`
+- maximum lateral drift below `25 m`
+- gimbal saturation below `10%`
+
+Open loop passes `1%` of trials. PD TVC and LQR TVC pass all `100` sampled trials, but the scatter plots are the more important evidence: they retain every controlled run and show distance to the tilt and drift boundaries. LQR's worst case is `17.92 deg` tilt and `19.10 m` drift, preserving `7.08 deg` and `5.90 m` of sampled worst-case margin. PD also passes, but its corresponding margins are only `2.12 deg` and `1.44 m`.
+
+Thrust misalignment is the dominant sampled sensitivity. For LQR, its correlation with peak tilt is `0.996` and with peak drift is `0.987`. That result is physically consistent: persistent transverse thrust both demands compensating TVC moment and leaves a residual lateral force that integrates into velocity and displacement. These finite, prescribed samples establish regression evidence inside the stated uncertainty box; they are not a probability-of-flight-success or certification claim.
+
+### Estimation Error Is Small Relative to the Controlled Excursion
+
+![Estimated-state control evidence](figures/estimated-state-control-evidence.svg)
+
+The gyro provides high-rate quaternion propagation,
+
+`omega_meas = omega + b_g + eta_g`,
+
+while a lower-rate noisy attitude reference bounds integrated drift. The accelerometer is modeled as powered-flight specific force,
+
+`f_B = R_IB(q) (a_I - g_I)`,
+
+and is not treated as a clean gravity vector during thrusting. That distinction prevents an invalid stationary-platform attitude assumption from entering the ascent estimator.
+
+The closed-loop maximum attitude-estimation error is `0.32 deg`, RMS error is `0.17 deg`, and maximum true tilt is `10.43 deg`. The sub-degree estimation error remains small relative to the controlled maneuver and does not drive gimbal saturation. This is a focused attitude filter, not a full translational inertial-navigation EKF; that claim boundary is intentional and explicit.
+
+### Finite Actuator Bandwidth Preserves Damping and Authority
+
+![Finite-bandwidth TVC evidence](figures/actuator-bandwidth-evidence.svg)
+
+The plant responds to achieved nozzle deflection, not the controller request:
+
+`delta_dot = sat_rate((delta_cmd - delta_act) / tau_servo)`
+
+`|delta_act| <= delta_max`.
+
+Servo lag introduces phase delay between sensed attitude error and corrective moment. Excessive delay would reduce rotational damping and can inject energy when the corrective torque arrives out of phase. Here the peak command is `1.50 deg`, the peak achieved deflection is `0.86 deg`, and the attitude response remains close to instantaneous TVC. The minimum available-minus-requested moment is `48.58 N m`; neither the rate nor position limiter is active. The controller is therefore not being stabilized in simulation by an impossible actuator request.
+
+### The Plant Changes During Propellant Depletion
+
+![Variable-mass and control-authority evidence](figures/variable-mass-evidence.svg)
+
+Propellant flow and acceleration obey
+
+`m_dot = -T / (I_sp g_0)` and `a_thrust = T(t) / m(t)`.
+
+Over the demonstration, mass decreases from `50.00 kg` to `48.93 kg`, transverse inertia from `3.15` to `3.07 kg m^2`, and center of mass moves from `-8.0 cm` to `-5.6 cm`. These changes affect both the disturbance plant and the control channel: `T/m` changes translational acceleration, lower inertia increases angular acceleration per unit moment, CM migration alters the CP/CM aerodynamic lever arm, and thrust level changes TVC moment authority.
+
+The fixed LQR remains stable with a `50.27 N m` minimum torque margin and `11.21 deg` maximum tilt. This is evidence of margin over the short modeled burn, not a substitute for full-envelope gain scheduling. Scheduling against mass state, thrust, and dynamic pressure is the appropriate next control-law extension.
+
+## Requirements and Traceability
+
+The acceptance criteria, evidence artifacts, and automated checks are mapped in [VERIFICATION_MATRIX.md](VERIFICATION_MATRIX.md). The principal checks include:
+
+| Requirement | Evidence |
 | --- | --- |
-| [FIGURE_INDEX.md](FIGURE_INDEX.md) | Quick visual guide with numerical takeaways and physical interpretation |
-| [PORTFOLIO_WRITEUP.md](PORTFOLIO_WRITEUP.md) | Polished project narrative suitable for a portfolio page |
-| [docs/figure_results_interpretations.md](docs/figure_results_interpretations.md) | Upper-division explanation of every generated plot |
-| [View interactive animation](https://htmlpreview.github.io/?https://github.com/flashgari/6dof-rocket-gnc-simulator/blob/main/outputs/rocket_flight_animation.html) | Browser-rendered synchronized animation of open loop, ideal torque, PD TVC, and LQR TVC |
-| [docs/week5_sensor_estimation.md](docs/week5_sensor_estimation.md) | Sensor-model and quaternion-estimator design notes |
-| [docs/week6_actuator_dynamics.md](docs/week6_actuator_dynamics.md) | Finite-bandwidth TVC actuator and authority-margin explanation |
-| [docs/week7_variable_mass.md](docs/week7_variable_mass.md) | Propellant depletion, thrust curve, shifting CM, and changing inertia explanation |
-| [outputs/week4b_monte_carlo_results.csv](outputs/week4b_monte_carlo_results.csv) | Trial-by-trial robustness data |
+| Quaternion state remains on the unit sphere | Dynamics tests and baseline CSV |
+| RK4 integration preserves force-free invariants within tolerance | Dynamics unit tests |
+| Disturbed open loop exhibits loss of thrust-axis alignment | Control-system evidence figure |
+| Controlled cases remain inside attitude, altitude, drift, and saturation gates | Nominal metrics and Monte Carlo CSV |
+| Estimated-state feedback remains stable under modeled sensor errors | Estimation evidence figure and tests |
+| Achieved TVC remains within rate, position, and torque authority | Actuator evidence figure and tests |
+| Variable mass, CM, and inertia evolve consistently with propellant depletion | Propulsion tests and variable-mass evidence |
 
-## Engineering Decisions
+There are `37` unit and integration tests covering math utilities, dynamics, disturbance response, control, TVC allocation, Monte Carlo reproducibility, estimation, actuator limits, and variable mass.
 
-| Decision | Rationale |
-| --- | --- |
-| Use quaternions for attitude | The open-loop failure intentionally passes through large rotations and near-inverted attitudes. Quaternions avoid Euler-angle singularities and keep force/moment projection well-defined through tumble. |
-| Build ideal torque before TVC | Ideal torque isolates the attitude-control law from actuator geometry. Once the feedback law is validated, TVC tests whether the requested moments can be generated by `r_engine x F_thrust`. |
-| Plot `body_z_z` and unwrapped pitch | Wrapped angles can make a tumbling vehicle look like it recovered. `body_z_z` directly measures vertical thrust-axis alignment, and unwrapped pitch preserves the continuous rotation history. |
-| Verify LQR in the nonlinear plant | LQR is designed from a local small-angle model, so the important check is not the linear math alone. The controller is run through nonlinear quaternion dynamics, aerodynamic moments, TVC allocation, and saturation telemetry. |
-| Add sensor-based feedback | Real flight software does not receive truth-state quaternion and angular rate. The estimator layer tests whether gyro bias/noise and low-rate attitude corrections keep control-relevant attitude error small. |
-| Add actuator dynamics | The vehicle responds to achieved gimbal angle, not requested gimbal angle. First-order lag and rate limits expose phase delay, tracking error, and practical TVC authority margin. |
-| Add variable mass | A launch vehicle is a time-varying plant. `T/m`, `I(t)`, CM location, aerodynamic moment arms, and TVC authority all change through the burn, motivating gain scheduling. |
+## Reproduce the Evidence
 
-## Flight Physics
-
-This section summarizes the physical reasoning behind the simulator. The full plot-by-plot interpretation is in [docs/figure_results_interpretations.md](docs/figure_results_interpretations.md), but the governing ideas are included here so the README itself is understandable without opening every supporting file.
-
-The central modeling choice is to treat ascent as a coupled attitude/translation problem. A rocket does not simply "go up" because the engine is firing; it goes up only while the thrust axis remains aligned with the desired inertial direction. Once a disturbance rotates the body, the same thrust magnitude produces a different inertial acceleration vector.
-
-**Translational Dynamics**
-
-`m r_ddot_I = R_BI(q) F_B + [0, 0, -mg]`
-
-The simulator computes thrust and aerodynamic forces in the body frame, then rotates them into the inertial frame using the quaternion attitude. This is the key coupling between attitude and trajectory. If the body `z` axis points upward, thrust mostly contributes to altitude. If the body rotates sideways, the same engine force contributes to crossrange acceleration. If the vehicle tumbles through inverted attitudes, thrust can even oppose ascent. That is why attitude stabilization is not a cosmetic requirement; it is directly required for translational performance.
-
-**Rigid-Body Rotation**
-
-`I omega_dot_B + omega_B x (I omega_B) = tau_B`
-
-The rotational dynamics use Euler's rigid-body equation in body coordinates. The `I omega_dot_B` term is the direct angular acceleration response to moment, while `omega_B x (I omega_B)` represents gyroscopic coupling between axes. Even for a simplified rocket body, this term matters once angular rates grow because torque and angular acceleration are not always collinear in the body frame. The controller therefore stabilizes a nonlinear rotational plant, not a scalar pitch-only toy model.
-
-The state uses quaternions instead of Euler angles because the open-loop failure intentionally passes through large rotations and near-inverted attitudes. Euler angles would introduce coordinate singularities and angle wrapping ambiguity; quaternions keep the force rotation well-defined throughout the tumble. The plots use unwrapped pitch and body-axis vertical alignment to avoid falsely interpreting a post-tumble orientation as recovery.
-
-**Aerodynamic Loading**
-
-`qbar = 0.5 rho |v_rel|^2`
-
-`F_N ~= qbar S C_N_alpha alpha`
-
-Aerodynamic force is computed from relative wind, not inertial velocity alone. Crosswind changes the velocity seen by the vehicle, which changes angle of attack and therefore normal force. Because dynamic pressure scales with `|v_rel|^2`, aerodynamic loads become more important as the vehicle accelerates. A small attitude error at low speed may be mild, while the same angular error at higher relative velocity produces much larger aerodynamic side force.
-
-The normal force acts through the center of pressure, while the equations of motion are taken about the center of mass. The resulting aerodynamic moment is approximately `(r_CP - r_CM) x F_N`. Depending on CP/CM ordering and sign convention, this moment can be restoring or destabilizing. In the disturbed open-loop case, the model is intentionally configured to demonstrate how an uncompensated aerodynamic/propulsive moment can drive attitude divergence.
-
-**Thrust Projection**
-
-`T_vertical = T cos(theta)`
-
-`T_lateral = T sin(theta)`
-
-These projection equations explain the shape of the altitude and lateral-drift plots. As tilt angle grows, the vertical thrust component decreases with `cos(theta)`, while lateral thrust grows with `sin(theta)`. Near `90 deg` tilt, the engine is mostly accelerating the vehicle sideways. Past `90 deg`, part of the thrust points downward. This is why the uncontrolled case reaches a low final altitude and large lateral drift even though the engine is still producing thrust.
-
-The `body_z_z` metric used in the plots is a compact way to track this effect because it is the vertical component of the body thrust axis. Values near `1` mean thrust is aligned with inertial up. Values near `0` mean thrust is horizontal. Negative values mean the thrust axis is inverted. This is more physically meaningful than only looking at a wrapped pitch angle.
-
-**Moment And TVC Authority**
-
-`tau = r x F`
-
-`tau_TVC = r_engine x F_thrust`
-
-`tau_max,TVC ~= L T sin(delta_max)`
-
-Every major disturbance and actuator in the project is a moment-arm problem. A thrust misalignment or thrust offset creates a moment because the force line of action does not pass perfectly through the center of mass. Aerodynamic normal force creates a moment because the center of pressure is displaced from the center of mass. TVC creates a corrective moment by intentionally tilting the thrust vector at an engine location below the center of mass.
-
-The TVC authority estimate `L T sin(delta_max)` is important because it turns the controller from an abstract feedback law into an actuator-limited system. Increasing gain cannot create unlimited moment; once the gimbal limit is reached, the commanded torque cannot be fully realized. This is why the project tracks gimbal angle and saturation fraction. In the nominal and Monte Carlo results here, the controllers stabilize the vehicle without sustained saturation, which supports the claim that the response is feasible for the modeled actuator rather than only mathematically stabilized by unrealistic torque.
-
-**PD Control Versus LQR**
-
-The PD controller adds rotational stiffness and damping:
-
-`tau_cmd = Kp e - Kd omega`
-
-The proportional term commands torque against thrust-axis attitude error, while the derivative term damps angular-rate growth. This is a useful first controller because it makes the physical stabilization mechanism transparent.
-
-The LQR controller is designed from a local small-angle model:
-
-`theta_dot = omega`
-
-`omega_dot = tau / I`
-
-The `Q/R` weighting changes the trade between attitude/rate error and control effort. LQR is not treated as a global tumble-recovery proof; it is a local controller around upright ascent. The important verification step is therefore running the LQR command through the same nonlinear quaternion dynamics and TVC allocation used for the PD controller. Its lower tilt and lateral drift show improved local regulation, while the gimbal telemetry checks that the improvement does not come from ignoring actuator limits.
-
-**Sensor Modeling And Estimated-State Feedback**
-
-`omega_meas = omega_true + b_g + eta_g`
-
-`f_meas = R_IB(q)(a_I - g_I) + b_a + eta_a`
-
-`q_hat_dot = 0.5 q_hat [0, omega_meas - b_hat]`
-
-Week 5 adds the distinction between truth-state control and estimated-state control. Gyro bias and noise corrupt angular-rate feedback, accelerometer measurements reflect powered-flight specific force, and attitude reference updates arrive at a lower rate than the dynamics integration. The controller therefore acts on `q_hat` and `omega_hat`, not on the true plant state. This tests whether estimation error remains small enough that the LQR TVC controller still preserves thrust-axis alignment without overusing gimbal authority.
-
-**Actuator Dynamics And Stability Margin**
-
-`delta_dot_cmd = (delta_cmd - delta_act) / tau_servo`
-
-`|delta_dot_act| <= delta_dot_max`
-
-`|delta_act| <= delta_max`
-
-Instantaneous TVC hides an important closed-loop effect: the controller's requested moment is not necessarily the moment applied to the vehicle. A real gimbal has bandwidth, rate limits, and position limits. These limits create phase lag and amplitude loss between the requested lateral thrust vector and the achieved lateral thrust vector. Since pitch/yaw stabilization depends on timely corrective moment, actuator lag can reduce damping or destabilize an otherwise acceptable controller.
-
-The Week 6 actuator diagnostics therefore track commanded gimbal, achieved gimbal, gimbal lag error, rate-limit fraction, position-limit fraction, and torque-authority margin. This connects the software controller to physical actuator feasibility. A positive margin under `tau_max,TVC ~= L T sin(delta_max)` means the controller's requested moment fits inside the modeled engine-gimbal authority. The nominal actuator-limited result shows a visible but bounded `1.50 deg` gimbal lag, no rate limiting, and stable thrust-axis alignment, so the LQR controller retains practical margin beyond the ideal-TVC assumption.
-
-**Variable Mass, Thrust Curve, And Gain Scheduling Motivation**
-
-`m_dot = -T / (Isp g0)`
-
-`a_thrust = T(t) / m(t)`
-
-`I(t) omega_dot + omega x (I(t) omega) = tau`
-
-Propellant depletion couples propulsion to both translation and rotation. As mass decreases, the same thrust produces larger acceleration unless the thrust curve falls enough to offset it. As inertia changes, the same TVC or aerodynamic moment produces a different angular acceleration. As CM shifts, the CP/CM moment arm changes, so the aerodynamic disturbance moment is time-varying. These are exactly the effects that make ascent GNC a scheduled-control problem rather than a single fixed-plant exercise.
-
-Week 7 keeps the LQR gains fixed and asks whether the controller still has enough margin as `m(t)`, `I(t)`, `r_CM(t)`, and `T(t)` vary. The vehicle remains stable, but the changing response motivates gain scheduling versus dynamic pressure, mass state, and thrust level.
-
-## How To Run
-
-The project uses only the Python standard library.
+Requires Python `3.10+`; no third-party packages are required.
 
 ```bash
 python3 scripts/run_all.py
 ```
 
-This regenerates simulations, plots, milestone reports, the animation HTML, the Monte Carlo campaign, and the test suite.
+This regenerates the nominal cases, `300` Monte Carlo trials, milestone reports, recruiter-facing figures, interactive animation, and then runs the full test suite.
 
-Run tests only:
+Useful focused commands:
 
 ```bash
 python3 -m unittest discover -s tests
+python3 scripts/plot_recruiter_evidence.py
+python3 scripts/build_animation.py
 ```
 
-Current verification:
+## Repository Guide
 
-```text
-Ran 37 tests
-OK
-```
-
-## Primary Artifacts
-
-| Artifact | Purpose |
+| Path | Contents |
 | --- | --- |
-| [figures/week4b-monte-carlo-robustness.svg](figures/week4b-monte-carlo-robustness.svg) | Recruiter-facing Monte Carlo robustness summary |
-| [figures/rocket-animation-preview.svg](figures/rocket-animation-preview.svg) | README preview for the interactive rocket-flight animation |
-| [figures/week4a-lqr-control-comparison.svg](figures/week4a-lqr-control-comparison.svg) | Open loop vs ideal torque vs PD TVC vs LQR TVC comparison |
-| [figures/week5-estimated-state-tvc.svg](figures/week5-estimated-state-tvc.svg) | Recruiter-facing sensor, estimator, and estimated-state TVC diagnostics |
-| [figures/week5-truth-vs-estimated-control.svg](figures/week5-truth-vs-estimated-control.svg) | Truth-feedback LQR vs estimated-feedback LQR comparison |
-| [figures/week6-actuator-limited-tvc.svg](figures/week6-actuator-limited-tvc.svg) | Finite-bandwidth TVC actuator, gimbal lag, and torque-authority diagnostics |
-| [figures/week7-variable-mass-ascent.svg](figures/week7-variable-mass-ascent.svg) | Thrust curve, mass depletion, changing inertia/CM, and TVC authority diagnostics |
-| [View interactive animation](https://htmlpreview.github.io/?https://github.com/flashgari/6dof-rocket-gnc-simulator/blob/main/outputs/rocket_flight_animation.html) | Browser-rendered synchronized animation of open loop, ideal torque, PD TVC, and LQR TVC |
-| [outputs/rocket_flight_animation.html](outputs/rocket_flight_animation.html) | Source HTML artifact for local download/opening |
-| [outputs/week4b_monte_carlo_results.csv](outputs/week4b_monte_carlo_results.csv) | Trial-by-trial robustness data |
-| [outputs/week5_estimated_tvc_plots.svg](outputs/week5_estimated_tvc_plots.svg) | Sensor, estimator, and estimated-state TVC diagnostic plots |
-| [outputs/week5_estimated_vs_truth_control_plots.svg](outputs/week5_estimated_vs_truth_control_plots.svg) | Truth-feedback LQR vs estimated-feedback LQR comparison |
-| [outputs/week6_actuator_limited_tvc_plots.svg](outputs/week6_actuator_limited_tvc_plots.svg) | Actuator-limited TVC comparison and authority-margin plots |
-| [outputs/week7_variable_mass_plots.svg](outputs/week7_variable_mass_plots.svg) | Variable-mass powered-ascent comparison and mass-property plots |
-| [FIGURE_INDEX.md](FIGURE_INDEX.md) | Fast visual guide with numerical takeaways and physical interpretations |
-| [docs/figure_results_interpretations.md](docs/figure_results_interpretations.md) | Upper-division explanation of every generated graph |
+| [`rocket_sim/dynamics.py`](rocket_sim/dynamics.py) | Nonlinear force, moment, quaternion, and rigid-body equations |
+| [`rocket_sim/control.py`](rocket_sim/control.py) | Quaternion PD and local LQR feedback |
+| [`rocket_sim/actuators.py`](rocket_sim/actuators.py) | TVC allocation, lag, slew, position, and authority logic |
+| [`rocket_sim/sensors.py`](rocket_sim/sensors.py) | IMU errors and quaternion attitude estimator |
+| [`rocket_sim/propulsion.py`](rocket_sim/propulsion.py) | Thrust curve, mass flow, CM, and inertia schedule |
+| [`scripts/plot_recruiter_evidence.py`](scripts/plot_recruiter_evidence.py) | Deterministic SVG evidence generated from CSV histories |
+| [`outputs/`](outputs/) | Committed CSV data, raw diagnostics, reports, and animation |
+| [`tests/`](tests/) | Unit and integration verification |
+| [FIGURE_INDEX.md](FIGURE_INDEX.md) | Plot-by-plot upper-division interpretation |
+| [PORTFOLIO_WRITEUP.md](PORTFOLIO_WRITEUP.md) | Full technical narrative and design rationale |
 
-## Technical Scope
+## Model Boundaries
 
-### Week 1: Dynamics Core
+This is a portfolio-scale GNC demonstration, not flight-qualified software or a high-fidelity launch-vehicle prediction.
 
-- 13-state rigid-body model: inertial position, inertial velocity, body-to-inertial quaternion, body angular velocity
-- Quaternion attitude propagation
-- Translational dynamics with thrust and gravity
-- Rotational dynamics using Euler's rigid-body equation
-- Fixed-step RK4 integration
-- Conservation and sanity tests
+- The atmosphere uses a simplified low-altitude density model.
+- Aerodynamics use compact drag and linear normal-force relationships rather than tabulated Mach/angle-of-attack coefficients.
+- Structural flexibility, slosh, engine mount compliance, sensor alignment calibration, and navigation-state covariance are not modeled.
+- The `3 s` case is intentionally short and low altitude; no max-Q, staging, Earth rotation, or orbital insertion claim is made.
+- LQR is designed locally and then checked in the nonlinear plant; no global stability proof is claimed.
+- Monte Carlo distributions are declared engineering test inputs, not validated flight uncertainty distributions.
 
-### Week 2: Disturbances And Open-Loop Failure
-
-- Crosswind and relative-wind calculation
-- Thrust misalignment and thrust offset
-- Aerodynamic drag
-- Angle-of-attack normal force
-- CP/CM aerodynamic moment
-- Unwrapped attitude plotting to avoid false recovery after inverted flight
-
-### Week 3A: Ideal-Torque Attitude Control
-
-- Body-axis attitude error:
-
-```text
-e_I = z_body,I x z_cmd,I
-tau_cmd,B = Kp e_B - Kd omega_B
-```
-
-- Bounded ideal body torque
-- Controlled-vs-uncontrolled comparison
-- Verification that the feedback law stabilizes the nonlinear rigid body before actuator allocation
-
-### Week 3B: Thrust Vector Control
-
-- TVC allocation through:
-
-```text
-tau_TVC = r_engine x F_thrust
-```
-
-- Engine lever arm
-- Maximum gimbal angle
-- Requested vs achievable torque telemetry
-- Saturation tracking
-
-### Week 4A: LQR Controller
-
-- Small-angle linearized attitude model:
-
-```text
-theta_dot = omega
-omega_dot = tau / I
-```
-
-- Infinite-horizon LQR feedback with `Q/R` state-error/control-effort trade
-- Nonlinear verification through the same TVC actuator model
-
-### Week 4B: Monte Carlo Robustness
-
-- 100 deterministic randomized dispersions with fixed seed `4242`
-- Open loop, PD TVC, and LQR TVC evaluated for each dispersion
-- Randomized wind, mass, inertia, thrust, thrust alignment, CP location, normal-force slope, and gimbal authority
-- Pass/fail gates for max tilt, final altitude, max lateral drift, and gimbal saturation
-
-### Week 5: Sensor Simulation And Attitude Estimation
-
-- Biased/noisy gyro model
-- Specific-force accelerometer model
-- Low-rate noisy attitude reference
-- Quaternion attitude propagation and correction
-- Estimated-state LQR TVC feedback
-- True-vs-estimated attitude, rate, sensor, and gimbal plots
-
-### Week 6: Actuator Dynamics And Control Authority
-
-- First-order TVC gimbal response
-- Maximum gimbal angle and slew-rate constraints
-- Commanded vs achieved nozzle deflection
-- Gimbal lag error and actuator saturation telemetry
-- Required torque vs available `L T sin(delta_max)` TVC authority
-- Truth-state and estimated-state actuator-limited LQR comparison
-
-### Week 7: Variable-Mass Powered Ascent
-
-- Piecewise-linear thrust curve
-- Propellant depletion from `m_dot = -T / (Isp g0)`
-- Time-varying mass, inertia, and center of mass
-- `T/m` acceleration diagnostics
-- Thrust-dependent TVC authority margin
-- Constant-mass vs variable-mass actuator-limited LQR comparison
-
-## Repository Layout
-
-```text
-rocket_sim/
-  actuator_sim.py    actuator-limited closed-loop simulation loops
-  actuators.py       finite-bandwidth TVC actuator model
-  analysis.py        derived metrics and physical summary quantities
-  control.py         ideal torque, TVC, and LQR controllers
-  controlled_sim.py  ideal-torque closed-loop integration
-  dynamics.py        force, moment, and 13-state derivative model
-  integrators.py     RK4 integration
-  math3d.py          vector and quaternion utilities
-  models.py          State, RocketParams, Environment dataclasses
-  sim.py             open-loop simulation loop
-  tvc_sim.py         TVC closed-loop simulation loop
-scripts/
-  run_all.py
-  run_week1_ascent.py
-  run_week2_disturbed_ascent.py
-  run_week3a_controlled_ascent.py
-  run_week3b_tvc_ascent.py
-  run_week4a_lqr_tvc_ascent.py
-  run_week4b_monte_carlo.py
-  run_week5_estimated_tvc_ascent.py
-  run_week6_actuator_limited_tvc.py
-  run_week7_variable_mass_ascent.py
-  plot_outputs.py
-  write_reports.py
-  build_animation.py
-tests/
-  test_week1_dynamics.py
-  test_week2_disturbances.py
-  test_week3a_control.py
-  test_week3b_tvc.py
-  test_week4a_lqr.py
-  test_week4b_monte_carlo.py
-  test_week5_estimation.py
-  test_week6_actuators.py
-  test_week7_variable_mass.py
-docs/
-  technical_physics_notes.md
-  figure_results_interpretations.md
-  week1_equations.md
-  week2_disturbance_model.md
-  week3a_ideal_torque_control.md
-  week3b_tvc_control.md
-  week4a_lqr_control.md
-  week4b_monte_carlo.md
-  week5_sensor_estimation.md
-  week6_actuator_dynamics.md
-  week7_variable_mass.md
-  animation_viewer.md
-outputs/
-  generated CSV, SVG, HTML, and milestone reports
-figures/
-  recruiter-facing copies of the main SVG plots
-FIGURE_INDEX.md
-  fast visual review guide for the main plots
-```
-
-## Limitations And Next Work
-
-- Aerodynamics use a simplified normal-force model rather than full coefficient tables.
-- Mass, inertia, CM, and thrust are time-varying in Week 7, but the schedule is simplified rather than based on a detailed tank geometry or engine data set.
-- TVC actuator dynamics use a simplified first-order servo model rather than hardware-specific actuator data.
-- LQR is designed around the upright operating point and is not a global tumble-recovery controller.
-- Future extensions: gyro-bias estimation, translational Kalman filtering, gain scheduling, and higher-fidelity atmosphere/aerodynamics.
-
-## Interview Talking Points
-
-- Why quaternions are used for large attitude excursions and tumble cases.
-- How CP/CM offset produces aerodynamic moment through `(r_CP - r_CM) x F_N`.
-- Why open loop loses altitude when `T cos(theta)` collapses.
-- Why TVC couples attitude correction to lateral acceleration.
-- Why ideal torque is useful for control-law verification but not actuator-realistic.
-- Why LQR is local and must be verified in the nonlinear plant.
-- Why Monte Carlo robustness is stronger evidence than one nominal trajectory.
-- Why finite TVC bandwidth affects phase margin and moment authority.
-- Why mass depletion and changing inertia motivate gain scheduling.
+These limits define the next useful work: linearization along the trajectory, gain scheduling, frequency-domain robustness with actuator/structure modes, a full error-state navigation filter, and aerodynamic coefficient tables tied to a stated vehicle geometry.

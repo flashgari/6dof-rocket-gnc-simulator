@@ -2,6 +2,18 @@
 
 This file is the project-wide guide for interpreting every generated graph at an aerospace upper-division level. Each plot is tied to the governing equations, the numerical result, and the GNC relevance.
 
+For a recruiter-facing review, start with [the engineering evidence guide](../FIGURE_INDEX.md). It consolidates the raw milestone plots into five nonduplicative figures with numerical axes, acceptance boundaries, sampled margin, and explicit claim limitations:
+
+| Engineering question | Consolidated figure |
+| --- | --- |
+| How does attitude departure cause trajectory failure? | [`control-system-evidence.svg`](../figures/control-system-evidence.svg) |
+| Does feedback retain margin under matched dispersions? | [`monte-carlo-control-envelope.svg`](../figures/monte-carlo-control-envelope.svg) |
+| Can the controller operate on estimated state? | [`estimated-state-control-evidence.svg`](../figures/estimated-state-control-evidence.svg) |
+| Does finite TVC bandwidth preserve damping and moment authority? | [`actuator-bandwidth-evidence.svg`](../figures/actuator-bandwidth-evidence.svg) |
+| How do depletion, inertia, CM, and thrust jointly move the plant? | [`variable-mass-evidence.svg`](../figures/variable-mass-evidence.svg) |
+
+The sections below retain the development-level plots because they expose intermediate variables and limiting-case checks. They are supporting diagnostics, not the recommended first presentation of the project.
+
 ## Week 1 Baseline Ascent Plot
 
 Artifact:
